@@ -6,13 +6,16 @@ import { UsersModule } from './users/users.module';
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'postgres',
-      password: '1234', 
-      database: 'fitness_app', 
-      autoLoadEntities: true, 
-      synchronize: true, 
+      
+      url: process.env.DATABASE_URL,
+      host: process.env.DATABASE_URL ? undefined : 'localhost',
+      port: process.env.DATABASE_URL ? undefined : 5432,
+      username: process.env.DATABASE_URL ? undefined : 'postgres',
+      password: process.env.DATABASE_URL ? undefined : '1234',
+      database: process.env.DATABASE_URL ? undefined : 'fitness_app',
+      autoLoadEntities: true,
+      synchronize: true,
+      ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
     }),
     UsersModule,
   ],
