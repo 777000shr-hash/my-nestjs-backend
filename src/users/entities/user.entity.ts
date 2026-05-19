@@ -10,4 +10,11 @@ export class User {
 
   @Column()
   passwordHash!: string;
+
+  @Column()
+  username!: string;
+
+  @Column({ nullable: true, type: 'varchar'})
+  resetCode!: string | null;
+
 }

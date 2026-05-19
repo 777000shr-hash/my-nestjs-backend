@@ -25,7 +25,7 @@ export class UsersController {
   
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto.email, createUserDto.passwordHash);
+    return this.usersService.create(createUserDto.username, createUserDto.email, createUserDto.passwordHash);
   }
   @UseGuards(JwtAuthGuard)
   @Get(':id')
@@ -47,4 +47,10 @@ export class UsersController {
   update(@Param('id') id: string, @Body() body: any){
     return this.usersService.update(+id, body);
   }
+
+  @Post('forgot-password')
+async forgotPassword(@Body('email') email: string) {
+  await this.usersService.sendPasswordResetCode(email);
+  return { message: 'קוד אימות נשלח בהצלחה לתיבת המייל שלך' };
+}
 }
