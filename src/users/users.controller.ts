@@ -54,4 +54,14 @@ export class UsersController {
     return { message: 'A verification code has been successfully sent to your email inbox' };
   }
 
+  @Post('verify-code')
+  async verifyCode(@Body() body: { email: string; code: string;  }) {
+    const isValid = await this.usersService.verifyResetCode(body.email, body.code);
+    return { isValid };
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() resetPasswordDto: { email: string; code: string; newPassword: string }) {
+    return this.usersService.resetPassword(resetPasswordDto);
+  }
 }

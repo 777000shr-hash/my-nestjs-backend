@@ -126,9 +126,22 @@ export class UsersService {
       throw new BadRequestException('The verification code is invalid.');
     }
 
-    user.resetCode = null; 
-    await this.usersRepository.save(user);
+    return true;
+  }
 
-    return true; // הכל תקין!
+  async resetPassword(resetPasswordDto: { email: string; code: string; newPassword: string }) {
+    const { email, code, newPassword } = resetPasswordDto;
+    const user = await this.usersRepository.findOne({ where: { email } });
+    if (!user || user.resetCode !== code) {
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    user.passwordHash = hashedPassword;
+    user.resetCode = null;
+    await this.usersRepository.save(user);
+    
+    return { message: 'Password updated successfully' };
   }
 }
