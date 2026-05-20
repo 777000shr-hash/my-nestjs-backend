@@ -2,14 +2,15 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/users.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-
+import { PassportModule } from '@nestjs/passport';
+import { JwtStrategy } from './users/jwt.strategy';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, // טוען את ה-.env ראשון לכל האפליקציה
+      isGlobal: true,
     }),
-    // שינוי ל-forRootAsync שמבטיח טעינה רק לאחר שהקונפיגורציה מוכנה
+    PassportModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

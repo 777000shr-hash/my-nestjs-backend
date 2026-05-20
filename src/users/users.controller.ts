@@ -49,8 +49,9 @@ export class UsersController {
   }
 
   @Post('forgot-password')
-async forgotPassword(@Body('email') email: string) {
-  await this.usersService.sendPasswordResetCode(email);
-  return { message: 'קוד אימות נשלח בהצלחה לתיבת המייל שלך' };
-}
+  async forgotPassword(@Body('email') email: string) {
+    await this.usersService.sendPasswordResetCode(email);
+    return { message: 'A verification code has been successfully sent to your email inbox' };
+  }
+
 }

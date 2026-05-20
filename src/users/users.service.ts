@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import sgMail from '@sendgrid/mail';
 import { ConfigService } from '@nestjs/config';
+import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -19,6 +20,14 @@ export class UsersService {
   }
 
   async create(username: string, email: string, passwordHash: string) {
+
+    const existingUser = await this.usersRepository.findOne({ 
+      where: { email: email } 
+    });
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(passwordHash, salt);
     const newUser = this.usersRepository.create({ username, email, passwordHash: hashedPassword });
