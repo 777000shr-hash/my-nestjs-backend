@@ -4,9 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/main.js",
-    "test": "jest"
+    "build": "nest build",
+    "start": "node dist/main.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.21",
