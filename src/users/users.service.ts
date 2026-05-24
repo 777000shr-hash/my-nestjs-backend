@@ -6,7 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import sgMail from '@sendgrid/mail';
 import { ConfigService } from '@nestjs/config';
-import { CreateUserDto } from './dto/create-user.dto';
+
 
 @Injectable()
 export class UsersService {
@@ -84,7 +84,7 @@ export class UsersService {
     const user = await this.usersRepository.findOne({ where: { email } });
 
     if (!user) {
-    throw new NotFoundException('No registered user found with this email address');
+      throw new NotFoundException('No registered user found with this email address');
     }
 
     const apiKey = this.configService.get<string>('SENDGRID_API_KEY');
@@ -97,16 +97,20 @@ export class UsersService {
 
     const msg = {
       to: email,
-      
       from: 'Alrobics Support <airobics.app@gmail.com>', 
-      
-      
       replyTo: 'airobics.app@gmail.com', 
-      
       subject: 'Your password recovery code', 
-      text: `Hello, your password recovery verification code is: ${verificationCode}`,
+      text: `Hello, your password recovery verification code is: ${verificationCode}
+        This code is valid for the next 5 minutes only.`,
       html: `<strong>Hello,</strong><br>Your password recovery verification code is: <h1>${verificationCode}</h1>`,
     };
+
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+
+    await this.usersRepository.update(user.id, {
+      resetTokenExpiresAt: expiresAt,
+    });
 
     try {
       await sgMail.send(msg);
@@ -130,11 +134,17 @@ export class UsersService {
       throw new BadRequestException('The verification code is invalid.');
     }
 
+    const now = new Date();
+    if (user.resetTokenExpiresAt && new Date() > new Date(user.resetTokenExpiresAt)) {
+      throw new BadRequestException('Code has expired');
+    }
+
     return true;
   }
 
   async resetPassword(resetPasswordDto: { email: string; code: string; newPassword: string }) {
     const { email, code, newPassword } = resetPasswordDto;
+
     const user = await this.usersRepository.findOne({ where: { email } });
     if (!user || user.resetCode !== code) {
       throw new BadRequestException('Invalid or expired verification code');
@@ -144,7 +154,11 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(newPassword, salt);
     user.passwordHash = hashedPassword;
     user.resetCode = null;
-    await this.usersRepository.save(user);
+    await this.usersRepository.update(user.id, {
+    passwordHash: hashedPassword,
+    resetCode: null,
+    resetTokenExpiresAt: null
+  });
     
     return { message: 'Password updated successfully' };
   }
