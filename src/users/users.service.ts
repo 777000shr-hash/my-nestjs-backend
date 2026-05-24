@@ -100,7 +100,8 @@ export class UsersService {
       from: 'Alrobics Support <airobics.app@gmail.com>', 
       replyTo: 'airobics.app@gmail.com', 
       subject: 'Your password recovery code', 
-      text: `Hello, your password recovery verification code is: ${verificationCode}`,
+      text: `Hello, your password recovery verification code is: ${verificationCode}
+        This code is valid for the next 5 minutes only.`,
       html: `<strong>Hello,</strong><br>Your password recovery verification code is: <h1>${verificationCode}</h1>`,
     };
 
