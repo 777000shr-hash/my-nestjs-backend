@@ -17,4 +17,7 @@ export class User {
   @Column({ nullable: true, type: 'varchar'})
   resetCode!: string | null;
 
+  @Column({ nullable: true, type: 'varchar'})
+  resetTokenExpiresAt!: Date | null;
+
 }

@@ -1,7 +1,8 @@
 import { Controller, Post, Body, Get, Param, Delete, Patch, UnauthorizedException, UseGuards, Req } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './create-user.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('users')
 export class UsersController {
@@ -12,7 +13,7 @@ export class UsersController {
     const user =  await this.usersService.validateUser(loginData.email, loginData.passwordHash);
 
     if(!user){
-      throw new UnauthorizedException('אימייל או סיסמה אינם נכונים');
+      throw new UnauthorizedException('Email or password is incorrect');
     }
     return  this.usersService.login(user);
   }
@@ -61,7 +62,7 @@ export class UsersController {
   }
 
   @Post('reset-password')
-  async resetPassword(@Body() resetPasswordDto: { email: string; code: string; newPassword: string }) {
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.usersService.resetPassword(resetPasswordDto);
   }
 }
