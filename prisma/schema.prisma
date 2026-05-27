@@ -1,0 +1,29 @@
+generator client {
+  provider        = "prisma-client-js"
+  //previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       Int       @id @default(autoincrement())
+  username String
+  email    String    @unique
+  password String
+  workouts Workout[]
+}
+
+model Workout {
+  id              Int      @id @default(autoincrement())
+  name            String?
+  reps            Int
+  workoutType     String
+  durationSeconds Int
+  caloriesBurned  Int      // פותר את השגיאה הנוכחית בשורה 18!
+  createdAt       DateTime @default(now()) // הגנה מראש למקרה שזו השורה הבאה בקוד
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id])
+}
