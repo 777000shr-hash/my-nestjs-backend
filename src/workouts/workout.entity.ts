@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne } from 'typeorm';
-import { User } from '../users/user.entity'; // מוודא חיבור למודול המשתמשים הקיים שלכן
+import { User } from '../users/entities/user.entity'; // הנתיב המדויק שמצאנו עכשיו!
 
 @Entity('workouts')
 export class Workout {
@@ -18,6 +18,7 @@ export class Workout {
   @CreateDateColumn()
   createdAt: Date;
 
-  @ManyToOne(() => User, (user) => user.id, { onDelete: 'CASCADE' })
+  // מקשר קבוע בין אימון למשתמש בבסיס הנתונים
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   user: User;
 }
