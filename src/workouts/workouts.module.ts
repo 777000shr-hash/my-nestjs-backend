@@ -3,10 +3,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkoutsController } from './workouts.controller';
 import { WorkoutsService } from './workouts.service';
 import { Workout } from './workout.entity';
-import { User } from '../users/user.entity';
+import { User } from '../users/entities/user.entity'; // <-- הנתיב המדויק והמתוקן!
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Workout, User])], // רושם את הטבלאות לשימוש
+  imports: [TypeOrmModule.forFeature([Workout, User])],
   controllers: [WorkoutsController],
   providers: [WorkoutsService],
 })
