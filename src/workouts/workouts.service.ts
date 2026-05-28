@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Workout } from './workout.entity';
-import { User } from '../users/user.entity';
+import { User } from '../users/entities/user.entity'; // הנתיב המעודכן
 
 @Injectable()
 export class WorkoutsService {
@@ -13,7 +13,7 @@ export class WorkoutsService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  // 1. שמירת אימון אמיתי בבסיס הנתונים
+  // 1. שמירת אימון אמיתי עם בדיקה שהמשתמש קיים בטבלה של שיינדי
   async addWorkout(userId: number, reps: number, workoutType: string) {
     const userExists = await this.userRepository.findOne({ where: { id: userId } });
     if (!userExists) {
@@ -33,7 +33,7 @@ export class WorkoutsService {
     return { userId, totalWorkouts, totalReps };
   }
 
-  // 3. לוח שיאים אמיתי לפי כמות אימונים
+  // 3. לוח שיאים מלא שמחבר את השמות מהטבלה של שיינדי
   async getLeaderboard() {
     const users = await this.userRepository.find();
     const leaderboard = await Promise.all(
