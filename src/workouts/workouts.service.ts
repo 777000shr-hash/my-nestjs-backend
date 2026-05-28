@@ -1,33 +1,33 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
 
-// נניח שיש שמות ישויות פשוטות, נתאים אותן למבנה של שיינדי בהמשך אם נצטרך
 @Injectable()
 export class WorkoutsService {
-  constructor(
-    @InjectRepository(any) // זמנית נשתמש בזה, או בשמות הישויות המדויקות שלכן
-    private readonly workoutRepository: Repository<any>,
-    @InjectRepository(any)
-    private readonly userRepository: Repository<any>,
-  ) {}
+  constructor() {} // השארנו ריק לגמרי כדי שלא יפיל את הבנייה
 
-  // 1. שמירת אימון חדש
+  // 1. שמירת אימון חדש (סימולציה)
   async addWorkout(userId: number, reps: number, workoutType: string) {
-    return { message: "Workout save trigger simulated", userId, reps, workoutType };
-  }
-
-  // 2. חישוב סטטיסטיקות
-  async getUserStats(userId: number) {
-    return {
-      userId,
-      totalWorkouts: 0,
-      totalReps: 0,
+    return { 
+      message: "Workout saved successfully (Simulation)", 
+      userId, 
+      reps, 
+      workoutType 
     };
   }
 
-  // 3. לוח שיאים
+  // 2. חישוב סטטיסטיקות (סימולציה)
+  async getUserStats(userId: number) {
+    return {
+      userId,
+      totalWorkouts: 15,
+      totalReps: 180,
+    };
+  }
+
+  // 3. לוח שיאים (סימולציה)
   async getLeaderboard() {
-    return [];
+    return [
+      { username: "malky", workoutCount: 15 },
+      { username: "shaindy", workoutCount: 12 }
+    ];
   }
 }
