@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkoutsController } from './workouts.controller';
 import { WorkoutsService } from './workouts.service';
-import { PrismaModule } from '../prisma/prisma.module'; // מייבא את החיבור לפריזמה
 
 @Module({
-  imports: [PrismaModule], // מאפשר ל-Service להשתמש בפריזמה
+  imports: [], // נשאיר ריק כרגע כדי שלא יחפש ישויות לא קיימות בזמן ה-Build
   controllers: [WorkoutsController],
   providers: [WorkoutsService],
 })
