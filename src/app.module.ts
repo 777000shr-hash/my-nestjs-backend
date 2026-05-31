@@ -4,6 +4,7 @@ import { UsersModule } from './users/users.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './users/jwt.strategy';
+import { WorkoutsModule } from './workouts/workouts.module'; // <-- שורה 1: הוספת ה-Import שלך
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { JwtStrategy } from './users/jwt.strategy';
         host: configService.get<string>('DB_HOST') || 'localhost',
         port: configService.get<number>('DB_PORT') || 5432,
         username: configService.get<string>('DB_USERNAME') || 'postgres',
-        password: configService.get<string>('DB_PASSWORD'), // קריאה בטוחה ומאובטחת!
+        password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME') || 'fitness_app',
         autoLoadEntities: true,
         synchronize: true,
@@ -28,6 +29,7 @@ import { JwtStrategy } from './users/jwt.strategy';
       }),
     }),
     UsersModule,
+    WorkoutsModule, // <-- שורה 2: הוספת המודול שלך בסוף מערך ה-imports
   ],
 })
 export class AppModule {}
