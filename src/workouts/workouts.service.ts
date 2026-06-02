@@ -13,7 +13,7 @@ export class WorkoutsService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  // 1. שמירת אימון עם כל השדות החדשים - מתוקן ל-Id גדול של שיינדי
+  // 1. שמירת אימון - שימוש ב-id קטן לפי ה-Entity של שיינדי
   async addWorkout(
     userId: number, 
     reps: number, 
@@ -23,8 +23,7 @@ export class WorkoutsService {
     date: string,
     day: string
   ) {
-    // תיקון: שינוי מ-id קטן ל-Id גדול כדי להתאים לטבלה של שיינדי
-    const userExists = await this.userRepository.findOne({ where: { Id: userId } });
+    const userExists = await this.userRepository.findOne({ where: { id: userId } });
     if (!userExists) {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
@@ -41,7 +40,7 @@ export class WorkoutsService {
     return await this.workoutRepository.save(newWorkout);
   }
 
-  // 2. שליפת סטטיסטיקות אמיתיות מה-DB
+  // 2. שליפת סטטיסטיקות
   async getUserStats(userId: number) {
     const workouts = await this.workoutRepository.find({ where: { userId } });
     const totalWorkouts = workouts.length;
@@ -50,13 +49,12 @@ export class WorkoutsService {
     return { userId, totalWorkouts, totalReps };
   }
 
-  // 3. לוח שיאים מלא שמחבר את השמות מהטבלה של שיינדי
+  // 3. לוח שיאים - מתוקן ל-user.id קטן שמסדר את ה-Build
   async getLeaderboard() {
     const users = await this.userRepository.find();
     const leaderboard = await Promise.all(
       users.map(async (user) => {
-        // תיקון: שינוי ל-user.Id גדול כדי לספור נכון את האימונים
-        const count = await this.workoutRepository.count({ where: { userId: user.Id } });
+        const count = await this.workoutRepository.count({ where: { userId: user.id } });
         return { username: user.username, workoutCount: count };
       })
     );
@@ -64,7 +62,7 @@ export class WorkoutsService {
     return leaderboard.sort((a, b) => b.workoutCount - a.workoutCount);
   }
 
-  // 4. שליפת היסטוריית אימונים מלאה עבור משתמש
+  // 4. שליפת היסטוריית אימונים
   async getWorkoutHistory(userId: number) {
     return await this.workoutRepository.find({
       where: { userId },
