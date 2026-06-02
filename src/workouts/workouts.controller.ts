@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../users/jwt-auth.guard';
 export class WorkoutsController {
   constructor(private readonly workoutsService: WorkoutsService) {}
 
-  // 1. שמירת אימון חדש - ה-userId נשלף מהטוקן
+  // 1. שמירת אימון חדש - מתוקן ל-userId לפי ה-JwtStrategy של שיינדי
   @UseGuards(JwtAuthGuard)
   @Post()
   async addWorkout(
@@ -18,7 +18,7 @@ export class WorkoutsController {
     @Body('date') date: string,
     @Body('day') day: string,
   ) {
-    const userId = req.user.id; 
+    const userId = req.user.userId; // שליפה מדויקת לפי ה-Strategy!
     return this.workoutsService.addWorkout(userId, reps, workoutType, duration, calories, date, day);
   }
 
@@ -35,12 +35,11 @@ export class WorkoutsController {
     return this.workoutsService.getLeaderboard();
   }
 
-  // 4. הגרסה החדשה! שליפת היסטוריית אימונים ללא ID בנתיב
-  // הנתיב החדש שאתי תקרא לו הוא פשוט: GET /workouts/history
+  // 4. שליפת היסטוריית אימונים ללא ID בנתיב - מתוקן ל-userId
   @UseGuards(JwtAuthGuard)
   @Get('history')
   async getWorkoutHistory(@Req() req: any) {
-    const userId = req.user.id; // שליפה מאובטחת של ה-ID ישירות מהטוקן
+    const userId = req.user.userId; // שליפה מדויקת לפי ה-Strategy!
     return this.workoutsService.getWorkoutHistory(userId);
   }
 }
