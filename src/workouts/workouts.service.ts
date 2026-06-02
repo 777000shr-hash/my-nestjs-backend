@@ -13,7 +13,7 @@ export class WorkoutsService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  // 1. שמירת אימון עם כל השדות החדשים שאתי ביקשה
+  // 1. שמירת אימון עם כל השדות החדשים - מתוקן ל-Id גדול של שיינדי
   async addWorkout(
     userId: number, 
     reps: number, 
@@ -23,7 +23,8 @@ export class WorkoutsService {
     date: string,
     day: string
   ) {
-    const userExists = await this.userRepository.findOne({ where: { id: userId } });
+    // תיקון: שינוי מ-id קטן ל-Id גדול כדי להתאים לטבלה של שיינדי
+    const userExists = await this.userRepository.findOne({ where: { Id: userId } });
     if (!userExists) {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
@@ -54,7 +55,8 @@ export class WorkoutsService {
     const users = await this.userRepository.find();
     const leaderboard = await Promise.all(
       users.map(async (user) => {
-        const count = await this.workoutRepository.count({ where: { userId: user.id } });
+        // תיקון: שינוי ל-user.Id גדול כדי לספור נכון את האימונים
+        const count = await this.workoutRepository.count({ where: { userId: user.Id } });
         return { username: user.username, workoutCount: count };
       })
     );
@@ -66,7 +68,7 @@ export class WorkoutsService {
   async getWorkoutHistory(userId: number) {
     return await this.workoutRepository.find({
       where: { userId },
-      order: { createdAt: 'DESC' }, // מציג את האימונים החדשים ביותר למעלה
+      order: { createdAt: 'DESC' },
     });
   }
 }
