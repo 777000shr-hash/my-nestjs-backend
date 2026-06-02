@@ -42,4 +42,21 @@ export class WorkoutsController {
     const userId = req.user.userId; // שליפה מדויקת לפי ה-Strategy!
     return this.workoutsService.getWorkoutHistory(userId);
   }
+
+  // 5. יצירת יעד חדש
+  @UseGuards(JwtAuthGuard)
+  @Post('goals')
+  async createGoal(@Req() req: any, @Body() goalData: any) {
+    const userId = req.user.userId; // מתוקן ל-userId
+    return await this.workoutsService.createGoal(userId, goalData);
+  }
+
+  // 6. קבלת כל היעדים של המשתמש
+  @UseGuards(JwtAuthGuard)
+  @Get('goals')
+  async getUserGoals(@Req() req: any) {
+    const userId = req.user.userId; // מתוקן ל-userId
+    return await this.workoutsService.getUserGoals(userId);
+  }
+  
 }
