@@ -61,4 +61,12 @@ export class WorkoutsService {
 
     return leaderboard.sort((a, b) => b.workoutCount - a.workoutCount);
   }
+
+  // 4. שליפת היסטוריית אימונים מלאה עבור משתמש
+  async getWorkoutHistory(userId: number) {
+    return await this.workoutRepository.find({
+      where: { userId },
+      order: { createdAt: 'DESC' }, // מציג את האימונים החדשים ביותר למעלה
+    });
+  }
 }
