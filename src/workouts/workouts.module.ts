@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { WorkoutsController } from './workouts.controller';
 import { WorkoutsService } from './workouts.service';
+import { WorkoutsController } from './workouts.controller';
 import { Workout } from './workout.entity';
-import { User } from '../users/entities/user.entity'; // <-- הנתיב המדויק והמתוקן!
+import { Goal } from './entities/goal.entity'; // הייבוא החדש
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Workout, User])],
+  imports: [TypeOrmModule: [Workout, Goal]], // הוספת Goal לכאן
   controllers: [WorkoutsController],
   providers: [WorkoutsService],
+  exports: [WorkoutsService],
 })
 export class WorkoutsModule {}
