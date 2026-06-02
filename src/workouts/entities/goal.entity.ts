@@ -12,10 +12,10 @@ export class Goal {
   @Column({ type: 'varchar' }) // 'DAILY' או 'WEEKLY'
   timeFrame: string;
 
-  @Column({ type: 'date' })
+  @Column({ type: 'varchar' }) // שונה מ-'date' ל-'varchar' בשביל תאימות מלאה לפוסטגרס
   startDate: string;
 
-  @Column({ type: 'date' })
+  @Column({ type: 'varchar' }) // שונה מ-'date' ל-'varchar' בשביל תאימות מלאה לפוסטגרס
   endDate: string;
 
   @Column({ type: 'varchar' }) // 'CALORIES' או 'DURATION'
