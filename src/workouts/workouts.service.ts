@@ -18,6 +18,7 @@ export class WorkoutsService {
   ) {}
 
   // 1. שמירת אימון
+  // 1. שמירת אימון ועדכון התקדמות יעד באופן אוטומטי
   async addWorkout(
     userId: number, 
     reps: number, 
@@ -32,6 +33,7 @@ export class WorkoutsService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
+    // שמירת האימון
     const newWorkout = this.workoutRepository.create({ 
       userId, 
       reps, 
@@ -41,9 +43,32 @@ export class WorkoutsService {
       date,
       day
     });
-    return await this.workoutRepository.save(newWorkout);
-  }
+    const savedWorkout = await this.workoutRepository.save(newWorkout);
 
+    // עדכון יעד פעיל במידה וקיים (לפי תאריך האימון הנוכחי)
+    const activeGoal = await this.goalsRepository.findOne({
+      where: [
+        {
+          userId,
+          startDate: LessThanOrEqual(date),
+          endDate: MoreThanOrEqual(date),
+        }
+      ]
+    });
+
+    if (activeGoal) {
+      // הוספת הערך הרלוונטי לפי סוג היעד
+      if (activeGoal.goalType === 'CALORIES') {
+        activeGoal.currentProgress += calories;
+      } else if (activeGoal.goalType === 'DURATION') {
+        activeGoal.currentProgress += duration;
+      }
+      
+      await this.goalsRepository.save(activeGoal);
+    }
+
+    return savedWorkout;
+  }
   // 2. שליפת סטטיסטיקות
   async getUserStats(userId: number) {
     const workouts = await this.workoutRepository.find({ where: { userId } });
