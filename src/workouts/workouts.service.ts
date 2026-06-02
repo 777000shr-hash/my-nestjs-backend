@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Workout } from './workout.entity';
-import { User } from '../users/entities/user.entity'; // הנתיב המעודכן
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class WorkoutsService {
@@ -13,18 +13,34 @@ export class WorkoutsService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  // 1. שמירת אימון אמיתי עם בדיקה שהמשתמש קיים בטבלה של שיינדי
-  async addWorkout(userId: number, reps: number, workoutType: string) {
+  // 1. שמירת אימון - שימוש ב-id קטן לפי ה-Entity של שיינדי
+  async addWorkout(
+    userId: number, 
+    reps: number, 
+    workoutType: string,
+    duration: number,
+    calories: number,
+    date: string,
+    day: string
+  ) {
     const userExists = await this.userRepository.findOne({ where: { id: userId } });
     if (!userExists) {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    const newWorkout = this.workoutRepository.create({ userId, reps, workoutType });
+    const newWorkout = this.workoutRepository.create({ 
+      userId, 
+      reps, 
+      workoutType,
+      duration,
+      calories,
+      date,
+      day
+    });
     return await this.workoutRepository.save(newWorkout);
   }
 
-  // 2. שליפת סטטיסטיקות אמיתיות מה-DB
+  // 2. שליפת סטטיסטיקות
   async getUserStats(userId: number) {
     const workouts = await this.workoutRepository.find({ where: { userId } });
     const totalWorkouts = workouts.length;
@@ -33,7 +49,7 @@ export class WorkoutsService {
     return { userId, totalWorkouts, totalReps };
   }
 
-  // 3. לוח שיאים מלא שמחבר את השמות מהטבלה של שיינדי
+  // 3. לוח שיאים - מתוקן ל-user.id קטן שמסדר את ה-Build
   async getLeaderboard() {
     const users = await this.userRepository.find();
     const leaderboard = await Promise.all(
@@ -44,5 +60,13 @@ export class WorkoutsService {
     );
 
     return leaderboard.sort((a, b) => b.workoutCount - a.workoutCount);
+  }
+
+  // 4. שליפת היסטוריית אימונים
+  async getWorkoutHistory(userId: number) {
+    return await this.workoutRepository.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+    });
   }
 }

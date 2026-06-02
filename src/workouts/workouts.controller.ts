@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, ParseIntPipe, UseGuards, Req } from '@nestjs/common';
 import { WorkoutsService } from './workouts.service';
 import { JwtAuthGuard } from '../users/jwt-auth.guard';
 
@@ -6,15 +6,20 @@ import { JwtAuthGuard } from '../users/jwt-auth.guard';
 export class WorkoutsController {
   constructor(private readonly workoutsService: WorkoutsService) {}
 
-  // 1. שמירת אימון חדש
+  // 1. שמירת אימון חדש - מתוקן ל-userId לפי ה-JwtStrategy של שיינדי
   @UseGuards(JwtAuthGuard)
   @Post()
   async addWorkout(
-    @Body('userId', ParseIntPipe) userId: number,
+    @Req() req: any,
     @Body('reps') reps: number,
     @Body('workoutType') workoutType: string,
+    @Body('duration') duration: number,
+    @Body('calories') calories: number,
+    @Body('date') date: string,
+    @Body('day') day: string,
   ) {
-    return this.workoutsService.addWorkout(userId, reps, workoutType);
+    const userId = req.user.userId; // שליפה מדויקת לפי ה-Strategy!
+    return this.workoutsService.addWorkout(userId, reps, workoutType, duration, calories, date, day);
   }
 
   // 2. קבלת סטטיסטיקות משתמש
@@ -24,9 +29,17 @@ export class WorkoutsController {
     return this.workoutsService.getUserStats(userId);
   }
 
-  // 3. קבלת לוח שיאים
+  // 3. קבלת לוח שיאים - ציבורי
   @Get('leaderboard')
   async getLeaderboard() {
     return this.workoutsService.getLeaderboard();
+  }
+
+  // 4. שליפת היסטוריית אימונים ללא ID בנתיב - מתוקן ל-userId
+  @UseGuards(JwtAuthGuard)
+  @Get('history')
+  async getWorkoutHistory(@Req() req: any) {
+    const userId = req.user.userId; // שליפה מדויקת לפי ה-Strategy!
+    return this.workoutsService.getWorkoutHistory(userId);
   }
 }
