@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Workout } from './workout.entity';
-import { User } from '../users/entities/user.entity'; // הנתיב המעודכן
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class WorkoutsService {
@@ -13,14 +13,30 @@ export class WorkoutsService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  // 1. שמירת אימון אמיתי עם בדיקה שהמשתמש קיים בטבלה של שיינדי
-  async addWorkout(userId: number, reps: number, workoutType: string) {
+  // 1. שמירת אימון עם כל השדות החדשים שאתי ביקשה
+  async addWorkout(
+    userId: number, 
+    reps: number, 
+    workoutType: string,
+    duration: number,
+    calories: number,
+    date: string,
+    day: string
+  ) {
     const userExists = await this.userRepository.findOne({ where: { id: userId } });
     if (!userExists) {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    const newWorkout = this.workoutRepository.create({ userId, reps, workoutType });
+    const newWorkout = this.workoutRepository.create({ 
+      userId, 
+      reps, 
+      workoutType,
+      duration,
+      calories,
+      date,
+      day
+    });
     return await this.workoutRepository.save(newWorkout);
   }
 
