@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param, ParseIntPipe, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
 import { WorkoutsService } from './workouts.service';
 import { JwtAuthGuard } from '../users/jwt-auth.guard';
 
@@ -22,14 +22,15 @@ export class WorkoutsController {
     return this.workoutsService.addWorkout(userId, reps, workoutType, duration, calories, date, day);
   }
 
-  // 2. קבלת סטטיסטיקות משתמש
+  // 2. קבלת סטטיסטיקות משתמש - עודכן לשימוש בטוקן מאובטח ללא ID בנתיב
   @UseGuards(JwtAuthGuard)
-  @Get('stats/:userId')
-  async getUserStats(@Param('userId', ParseIntPipe) userId: number) {
+  @Get('stats')
+  async getUserStats(@Req() req: any) {
+    const userId = req.user.userId; // שליפה מדויקת לפי ה-Strategy!
     return this.workoutsService.getUserStats(userId);
   }
 
-  // 3. קבלת לוח שיאים - ציבורי
+  // 3. קבלת לוח שיאים שבועי (Top 5) - ציבורי
   @Get('leaderboard')
   async getLeaderboard() {
     return this.workoutsService.getLeaderboard();
