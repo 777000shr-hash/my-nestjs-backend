@@ -1,10 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'; // הוספנו BadRequestException
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThanOrEqual } from 'typeorm';
 import { Workout } from './workout.entity';
 import { User } from '../users/entities/user.entity';
 import { Goal } from './entities/goal.entity';
-import { LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 
 @Injectable()
 export class WorkoutsService {
@@ -18,7 +17,6 @@ export class WorkoutsService {
   ) {}
 
   // 1. שמירת אימון
-  // 1. שמירת אימון ועדכון התקדמות יעד באופן אוטומטי
   async addWorkout(
     userId: number, 
     reps: number, 
@@ -33,7 +31,6 @@ export class WorkoutsService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    // שמירת האימון
     const newWorkout = this.workoutRepository.create({ 
       userId, 
       reps, 
@@ -43,77 +40,69 @@ export class WorkoutsService {
       date,
       day
     });
-    const savedWorkout = await this.workoutRepository.save(newWorkout);
-
-    // עדכון יעד פעיל במידה וקיים (לפי תאריך האימון הנוכחי)
-    const activeGoal = await this.goalsRepository.findOne({
-      where: [
-        {
-          userId,
-          startDate: LessThanOrEqual(date),
-          endDate: MoreThanOrEqual(date),
-        }
-      ]
-    });
-
-    if (activeGoal) {
-  // הוספת הערך הרלוונטי לפי סוג היעד
-  if (activeGoal.goalType === 'CALORIES') {
-    activeGoal.currentProgress += calories;
-  } else if (activeGoal.goalType === 'REPS') {
-    activeGoal.currentProgress += reps; // הוספת חזרות במקום דקות
+    return await this.workoutRepository.save(newWorkout);
   }
-  
-  await this.goalsRepository.save(activeGoal);
-}
-    return savedWorkout;
-  }
+
   // 2. שליפת סטטיסטיקות
- async getUserStats(userId: number) {
-  const workouts = await this.workoutRepository.find({ where: { userId } });
-  const totalWorkouts = workouts.length;
-  const totalReps = workouts.reduce((sum, w) => sum + w.reps, 0);
-  const totalCalories = workouts.reduce((sum, w) => sum + w.calories, 0); // הוספת חישוב קלוריות
+  async getUserStats(userId: number) {
+    const workouts = await this.workoutRepository.find({ where: { userId } });
+    const totalWorkouts = workouts.length;
+    const totalReps = workouts.reduce((sum, w) => sum + w.reps, 0);
+    const totalCalories = workouts.reduce((sum, w) => sum + w.calories, 0);
 
-  return { userId, totalWorkouts, totalReps, totalCalories };
-}
+    return { userId, totalWorkouts, totalReps, totalCalories };
+  }
 
-  // 3. לוח שיאים
-  async getLeaderboard() {
-  // חישוב תאריך של לפני שבוע מהיום
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  const formattedDate = oneWeekAgo.toISOString().split('T')[0]; // פורמט YYYY-MM-DD
+  // מנגנון עזר משותף לשוברי שוויון בלוח השיאים
+  private async getLeaderboardBase(metricExtractor: (workouts: Workout[]) => number) {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const formattedDate = oneWeekAgo.toISOString().split('T')[0];
 
-  const users = await this.userRepository.find();
-  
-  const leaderboard = await Promise.all(
-    users.map(async (user) => {
-      // שליפת כל האימונים של המשתמש מהשבוע האחרון
-      const weeklyWorkouts = await this.workoutRepository.find({
-        where: { 
-          userId: user.id,
-          date: MoreThanOrEqual(formattedDate)
+    const users = await this.userRepository.find();
+    
+    const leaderboard = await Promise.all(
+      users.map(async (user) => {
+        const weeklyWorkouts = await this.workoutRepository.find({
+          where: { userId: user.id, date: MoreThanOrEqual(formattedDate) },
+          order: { createdAt: 'DESC' }
+        });
+
+        const score = metricExtractor(weeklyWorkouts);
+        const lastWorkoutTime = weeklyWorkouts.length > 0 ? weeklyWorkouts[0].createdAt.getTime() : 0;
+
+        return {
+          id: user.id,
+          username: user.username,
+          score,
+          lastWorkoutTime
+        };
+      })
+    );
+
+    // מיון לפי הציון הגבוה, ובמקרה של שוויון לפי תאריך יצירת האימון האחרון
+    return leaderboard
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
         }
-      });
+        return b.lastWorkoutTime - a.lastWorkoutTime;
+      })
+      .slice(0, 5)
+      .map(({ id, username, score }) => ({ id, username, value: score }));
+  }
 
-      // סכימת החזרות של המשתמש בשבוע זה
-      const totalWeeklyReps = weeklyWorkouts.reduce((sum, w) => sum + w.reps, 0);
+  // 3א. לוח שיאים - קלוריות
+  async getCaloriesLeaderboard() {
+    const board = await this.getLeaderboardBase((workouts) => workouts.reduce((sum, w) => sum + w.calories, 0));
+    return board.map(u => ({ id: u.id, username: u.username, weeklyCalories: u.value }));
+  }
 
-      return { 
-        id: user.id, // הוספת id המשתמש לבקשת אתי
-        username: user.username, 
-        weeklyReps: totalWeeklyReps 
-      };
-    })
-  );
-
-  // סינון משתמשים ללא חזרות בכלל, מיון מהגבוה לנמוך, ולקיחת 5 המובילים בלבד
-  return leaderboard
-    .filter(user => user.weeklyReps > 0)
-    .sort((a, b) => b.weeklyReps - a.weeklyReps)
-    .slice(0, 5);
-}
+  // 3ב. לוח שיאים - חזרות
+  async getRepsLeaderboard() {
+    const board = await this.getLeaderboardBase((workouts) => workouts.reduce((sum, w) => sum + w.reps, 0));
+    return board.map(u => ({ id: u.id, username: u.username, weeklyReps: u.value }));
+  }
 
   // 4. שליפת היסטוריית אימונים
   async getWorkoutHistory(userId: number) {
@@ -123,36 +112,128 @@ export class WorkoutsService {
     });
   }
 
-  // 5. יצירת יעד חדש ומניעת חפיפות
+  // 5. יצירת יעד חדש ללא חסימת חפיפות
   async createGoal(userId: number, goalData: any) {
-    const overlappingGoal = await this.goalsRepository.findOne({
-      where: [
-        {
-          userId,
-          startDate: LessThanOrEqual(goalData.endDate),
-          endDate: MoreThanOrEqual(goalData.startDate),
-        }
-      ]
-    });
-
-    if (overlappingGoal) {
-      throw new BadRequestException('קיימת כבר חפיפת זמנים עם יעד אחר בתקופה זו');
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // אכיפת שבועות עגולים במידה ונבחר שבועי
+    if (goalData.periodType === 'WEEKLY' && goalData.durationWeeks) {
+      const daysNeeded = goalData.durationWeeks * 7;
+      const end = new Date();
+      end.setDate(end.getDate() + daysNeeded);
+      goalData.endDate = end.toISOString().split('T')[0];
     }
 
     const newGoal = this.goalsRepository.create({
       ...goalData,
       userId,
-      currentProgress: 0
+      startDate: todayStr, // מוגדר תמיד מהרגע הנוכחי
     });
 
     return await this.goalsRepository.save(newGoal);
   }
 
-  // 6. שליפת כל היעדים של המשתמש - מסודר מהחדש לישן לפי תאריך ההתחלה
+  // 6. שליפת יעדים וחישוב התקדמות כפול דינמי בזמן אמת
   async getUserGoals(userId: number) {
-    return await this.goalsRepository.find({
-      where: { userId },
-      order: { startDate: 'DESC' }, // החדש למעלה, הישן למטה
-    });
+    const goals = await this.goalsRepository.find({ where: { userId } });
+    const workouts = await this.workoutRepository.find({ where: { userId } });
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const active = [];
+    const past = [];
+
+    for (const goal of goals) {
+      const isCalories = goal.goalType === 'CALORIES';
+      
+      // א. חישוב התקדמות נקודתית (currentProgress)
+      let currentProgress = 0;
+      if (goal.periodType === 'DAILY') {
+        const todayWorkouts = workouts.filter(w => w.date === todayStr);
+        currentProgress = todayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
+      } else {
+        // שבועי - סכימת השבוע הנוכחי בתוך טווח היעד
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        const limitDate = oneWeekAgo.toISOString().split('T')[0];
+        const weeklyWorkouts = workouts.filter(w => w.date >= limitDate && w.date >= goal.startDate && w.date <= goal.endDate);
+        currentProgress = weeklyWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
+      }
+
+      // ב. חישוב התמדה כללית (persistenceProgress)
+      let persistenceProgress = 0;
+      const start = new Date(goal.startDate);
+      const end = new Date(goal.endDate);
+      const today = new Date(todayStr);
+      const currentEvaluationDate = today < end ? today : end;
+
+      if (goal.periodType === 'DAILY') {
+        let totalDaysElapsed = Math.floor((currentEvaluationDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        if (totalDaysElapsed < 1) totalDaysElapsed = 1;
+        
+        let successfulDays = 0;
+        for (let i = 0; i < totalDaysElapsed; i++) {
+          const d = new Date(start);
+          d.setDate(d.getDate() + i);
+          const currentDayStr = d.toISOString().split('T')[0];
+          
+          const dayWorkouts = workouts.filter(w => w.date === currentDayStr);
+          const dayTotal = dayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
+          if (dayTotal >= goal.targetValue) successfulDays++;
+        }
+        persistenceProgress = Math.round((successfulDays / totalDaysElapsed) * 100);
+      } else {
+        // שבועי
+        const totalWeeksElapsed = goal.durationWeeks || 1;
+        let successfulWeeks = 0;
+        
+        for (let i = 0; i < totalWeeksElapsed; i++) {
+          const wStart = new Date(start);
+          wStart.setDate(wStart.getDate() + (i * 7));
+          const wEnd = new Date(wStart);
+          wEnd.setDate(wEnd.getDate() + 7);
+
+          if (wStart > today) break; // השבוע עוד לא התחיל
+
+          const weekWorkouts = workouts.filter(w => {
+            const d = new Date(w.date);
+            return d >= wStart && d < wEnd;
+          });
+          const weekTotal = weekWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
+          if (weekTotal >= goal.targetValue) successfulWeeks++;
+        }
+        persistenceProgress = Math.round((successfulWeeks / totalWeeksElapsed) * 100);
+      }
+
+      const formattedGoal = {
+        ...goal,
+        currentProgress,
+        persistenceProgress: `${persistenceProgress}%`
+      };
+
+      if (todayStr <= goal.endDate) {
+        active.push(formattedGoal);
+      } else {
+        past.push(formattedGoal);
+      }
+    }
+
+    // מיון פנימי מהחדש לישן
+    active.sort((a, b) => b.startDate.localeCompare(a.startDate));
+    past.sort((a, b) => b.startDate.localeCompare(a.startDate));
+
+    return { active, past };
+  }
+
+  // 7. מחיקת יעד אישי
+  async deleteGoal(userId: number, goalId: number) {
+    const goal = await this.goalsRepository.findOne({ where: { id: goalId } });
+    if (!goal) {
+      throw new NotFoundException(`Goal with ID ${goalId} not found`);
+    }
+    if (goal.userId !== userId) {
+      throw new ForbiddenException('אינך מורשה למחוק יעד זה');
+    }
+    await this.goalsRepository.remove(goal);
+    return { success: true, message: 'היעד נמחק בהצלחה' };
   }
 }
