@@ -1,5 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { User } from '../../users/entities/user.entity'; // ודאי שהנתיב לישות המשתמש נכון עבורך
 
 @Entity('goals')
 export class Goal {
@@ -9,27 +9,28 @@ export class Goal {
   @Column()
   userId: number;
 
-  @Column({ type: 'varchar' }) // 'DAILY' או 'WEEKLY'
-  timeFrame: string;
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'userId' })
+  user: User;
 
-  @Column({ type: 'varchar' }) // שונה מ-'date' ל-'varchar' בשביל תאימות מלאה לפוסטגרס
-  startDate: string;
+  @Column({ type: 'varchar' })
+  goalType: 'CALORIES' | 'REPS'; // סוג היעד: קלוריות או חזרות
 
-  @Column({ type: 'varchar' }) // שונה מ-'date' ל-'varchar' בשביל תאימות מלאה לפוסטגרס
-  endDate: string;
+  @Column({ type: 'varchar' })
+  periodType: 'DAILY' | 'WEEKLY'; // מחזוריות היעד
 
-  @Column({ type: 'varchar' }) // 'CALORIES' או 'DURATION'
-  goalType: string;
+  @Column({ type: 'int', nullable: true })
+  durationWeeks: number; // רלוונטי רק אם נבחר WEEKLY (מספר שבועות עגול)
 
-  @Column({ type: 'float' })
-  targetValue: number;
+  @Column({ type: 'int' })
+  targetValue: number; // ערך היעד (למשל 50 קלוריות ביום או 500 חזרות בשבוע)
 
-  @Column({ type: 'float', default: 0 })
-  currentProgress: number;
+  @Column({ type: 'date' })
+  startDate: string; // תמיד תאריך היצירה הנוכחי
+
+  @Column({ type: 'date' })
+  endDate: string; // תאריך הסיום המחושב/נבחר
 
   @CreateDateColumn()
   createdAt: Date;
-
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  user: User;
 }
