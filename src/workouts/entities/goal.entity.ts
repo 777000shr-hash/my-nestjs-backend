@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { User } from '../../users/entities/user.entity'; // ודאי שהנתיב לישות המשתמש נכון עבורך
+import { User } from '../../users/entities/user.entity';
 
 @Entity('goals')
 export class Goal {
@@ -13,24 +13,31 @@ export class Goal {
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @Column({ type: 'varchar' })
-  goalType: 'CALORIES' | 'REPS'; // סוג היעד: קלוריות או חזרות
+  @Column({ type: 'varchar', nullable: true })
+  goalType: 'CALORIES' | 'REPS'; // סוג היעד
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', nullable: true })
   periodType: 'DAILY' | 'WEEKLY'; // מחזוריות היעד
 
   @Column({ type: 'int', nullable: true })
-  durationWeeks: number; // רלוונטי רק אם נבחר WEEKLY (מספר שבועות עגול)
+  durationWeeks: number; // מספר שבועות עגול
 
-  @Column({ type: 'int' })
-  targetValue: number; // ערך היעד (למשל 50 קלוריות ביום או 500 חזרות בשבוע)
+  @Column({ type: 'int', default: 0 })
+  targetValue: number; // ערך היעד
 
-  @Column({ type: 'date' })
-  startDate: string; // תמיד תאריך היצירה הנוכחי
+  @Column({ type: 'varchar', nullable: true })
+  startDate: string; // תאריך התחלה
 
-  @Column({ type: 'date' })
-  endDate: string; // תאריך הסיום המחושב/נבחר
+  @Column({ type: 'varchar', nullable: true })
+  endDate: string; // תאריך סיום
 
   @CreateDateColumn()
   createdAt: Date;
+
+  // שדות תאימות לאחור כדי למנוע קריסה של פוסטגרס מול עמודות ישנות בטבלה
+  @Column({ type: 'varchar', nullable: true })
+  timeFrame: string;
+
+  @Column({ type: 'float', nullable: true, default: 0 })
+  currentProgress: number;
 }
