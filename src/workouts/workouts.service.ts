@@ -139,8 +139,8 @@ export class WorkoutsService {
     const workouts = await this.workoutRepository.find({ where: { userId } });
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const active = [];
-    const past = [];
+    const active: [] = [];
+    const past: [] = [];
 
     for (const goal of goals) {
       const isCalories = goal.goalType === 'CALORIES';
