@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 
 @Entity('goals')
@@ -9,27 +9,35 @@ export class Goal {
   @Column()
   userId: number;
 
-  @Column({ type: 'varchar' }) // 'DAILY' או 'WEEKLY'
-  timeFrame: string;
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'userId' })
+  user: User;
 
-  @Column({ type: 'varchar' }) // שונה מ-'date' ל-'varchar' בשביל תאימות מלאה לפוסטגרס
-  startDate: string;
+  @Column({ type: 'varchar', nullable: true })
+  goalType: 'CALORIES' | 'REPS'; // סוג היעד
 
-  @Column({ type: 'varchar' }) // שונה מ-'date' ל-'varchar' בשביל תאימות מלאה לפוסטגרס
-  endDate: string;
+  @Column({ type: 'varchar', nullable: true })
+  periodType: 'DAILY' | 'WEEKLY'; // מחזוריות היעד
 
-  @Column({ type: 'varchar' }) // 'CALORIES' או 'DURATION'
-  goalType: string;
+  @Column({ type: 'int', nullable: true })
+  durationWeeks: number; // מספר שבועות עגול
 
-  @Column({ type: 'float' })
-  targetValue: number;
+  @Column({ type: 'int', default: 0 })
+  targetValue: number; // ערך היעד
 
-  @Column({ type: 'float', default: 0 })
-  currentProgress: number;
+  @Column({ type: 'varchar', nullable: true })
+  startDate: string; // תאריך התחלה
+
+  @Column({ type: 'varchar', nullable: true })
+  endDate: string; // תאריך סיום
 
   @CreateDateColumn()
   createdAt: Date;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  user: User;
+  // שדות תאימות לאחור כדי למנוע קריסה של פוסטגרס מול עמודות ישנות בטבלה
+  @Column({ type: 'varchar', nullable: true })
+  timeFrame: string;
+
+  @Column({ type: 'float', nullable: true, default: 0 })
+  currentProgress: number;
 }
