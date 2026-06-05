@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Body, Get, Delete, Param, UseGuards, Req } from '@nestjs/common';
 import { WorkoutsService } from './workouts.service';
 import { JwtAuthGuard } from '../users/jwt-auth.guard';
 
@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../users/jwt-auth.guard';
 export class WorkoutsController {
   constructor(private readonly workoutsService: WorkoutsService) {}
 
-  // 1. שמירת אימון חדש - מתוקן ל-userId לפי ה-JwtStrategy של שיינדי
+  // 1. שמירת אימון חדש
   @UseGuards(JwtAuthGuard)
   @Post()
   async addWorkout(
@@ -18,29 +18,35 @@ export class WorkoutsController {
     @Body('date') date: string,
     @Body('day') day: string,
   ) {
-    const userId = req.user.userId; // שליפה מדויקת לפי ה-Strategy!
+    const userId = req.user.userId;
     return this.workoutsService.addWorkout(userId, reps, workoutType, duration, calories, date, day);
   }
 
-  // 2. קבלת סטטיסטיקות משתמש - עודכן לשימוש בטוקן מאובטח ללא ID בנתיב
+  // 2. קבלת סטטיסטיקות משתמש
   @UseGuards(JwtAuthGuard)
   @Get('stats')
   async getUserStats(@Req() req: any) {
-    const userId = req.user.userId; // שליפה מדויקת לפי ה-Strategy!
+    const userId = req.user.userId;
     return this.workoutsService.getUserStats(userId);
   }
 
-  // 3. קבלת לוח שיאים שבועי (Top 5) - ציבורי
-  @Get('leaderboard')
-  async getLeaderboard() {
-    return this.workoutsService.getLeaderboard();
+  // 3א. לוח שיאים שבועי - קלוריות (Top 5)
+  @Get('leaderboard/calories')
+  async getCaloriesLeaderboard() {
+    return this.workoutsService.getCaloriesLeaderboard();
   }
 
-  // 4. שליפת היסטוריית אימונים ללא ID בנתיב - מתוקן ל-userId
+  // 3ב. לוח שיאים שבועי - חזרות (Top 5)
+  @Get('leaderboard/reps')
+  async getRepsLeaderboard() {
+    return this.workoutsService.getRepsLeaderboard();
+  }
+
+  // 4. שליפת היסטוריית אימונים
   @UseGuards(JwtAuthGuard)
   @Get('history')
   async getWorkoutHistory(@Req() req: any) {
-    const userId = req.user.userId; // שליפה מדויקת לפי ה-Strategy!
+    const userId = req.user.userId;
     return this.workoutsService.getWorkoutHistory(userId);
   }
 
@@ -48,16 +54,23 @@ export class WorkoutsController {
   @UseGuards(JwtAuthGuard)
   @Post('goals')
   async createGoal(@Req() req: any, @Body() goalData: any) {
-    const userId = req.user.userId; // מתוקן ל-userId
+    const userId = req.user.userId;
     return await this.workoutsService.createGoal(userId, goalData);
   }
 
-  // 6. קבלת כל היעדים של המשתמש
+  // 6. קבלת היעדים של המשתמש (מחולק לפעילים ומהעבר)
   @UseGuards(JwtAuthGuard)
   @Get('goals')
   async getUserGoals(@Req() req: any) {
-    const userId = req.user.userId; // מתוקן ל-userId
+    const userId = req.user.userId;
     return await this.workoutsService.getUserGoals(userId);
   }
-  
+
+  // 7. מחיקת יעד אישי מאובטח ללא ID של משתמש בנתיב
+  @UseGuards(JwtAuthGuard)
+  @Delete('goals/:id')
+  async deleteGoal(@Req() req: any, @Param('id') goalId: string) {
+    const userId = req.user.userId;
+    return await this.workoutsService.deleteGoal(userId, +goalId);
+  }
 }
