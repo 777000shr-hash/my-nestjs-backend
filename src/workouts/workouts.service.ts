@@ -153,7 +153,7 @@ export class WorkoutsService {
     return await this.goalsRepository.save(newGoal);
   }
 
-  // 6. קבלת היעדים וחישוב התקדמות דינמי ומדויק בזמן אמת (מתוקן)
+  // 6. קבלת היעדים וחישוב התקדמות דינמי ומדויק בזמן אמת
   async getUserGoals(userId: number) {
     const goals = await this.goalsRepository.find({ where: { userId } });
     const workouts = await this.workoutRepository.find({ where: { userId } });
@@ -252,7 +252,11 @@ export class WorkoutsService {
         persistenceProgress: `${persistenceProgress}%`
       };
 
-      if (todayStr <= goal.endDate) {
+      // תיקון: חיתוך והשוואת תאריכים נקייה בפורמט YYYY-MM-DD למניעת שגיאות איתור
+      const cleanToday = todayStr.split('T')[0];
+      const cleanEndDate = goal.endDate.split('T')[0];
+
+      if (cleanToday <= cleanEndDate) {
         active.push(formattedGoal);
       } else {
         past.push(formattedGoal);
