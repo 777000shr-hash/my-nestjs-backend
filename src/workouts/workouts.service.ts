@@ -158,7 +158,7 @@ export class WorkoutsService {
     const goals = await this.goalsRepository.find({ where: { userId } });
     const workouts = await this.workoutRepository.find({ where: { userId } });
 
-    // תיקון: חישוב תאריך נוכחי מדויק לפי שעון ישראל (UTC+3) ללא תלות באימונים ישנים/עתידיים
+    // חישוב תאריך נוכחי מדויק לפי שעון ישראל (UTC+3) ללא תלות באימונים
     const todayStr = new Date(new Date().getTime() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     const active: any[] = [];
@@ -181,7 +181,7 @@ export class WorkoutsService {
         currentProgress = weeklyWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
       }
 
-      // ב. חישוב התמדה כללית (persistenceProgress) לפי ימים נבחרים
+      // ב. חישוב התמדה ואחוזי התקדמות (persistenceProgress)
       let persistenceProgress = 0;
       const start = new Date(goal.startDate);
       const end = new Date(goal.endDate);
@@ -222,26 +222,14 @@ export class WorkoutsService {
           : 0;
 
       } else {
-        // שבועי
-        const totalWeeksElapsed = goal.durationWeeks || 1;
-        let successfulWeeks = 0;
-        
-        for (let i = 0; i < totalWeeksElapsed; i++) {
-          const wStart = new Date(start);
-          wStart.setDate(wStart.getDate() + (i * 7));
-          const wEnd = new Date(wStart);
-          wEnd.setDate(wEnd.getDate() + 7);
-
-          if (wStart > today) break;
-
-          const weekWorkouts = workouts.filter(w => {
-            const d = new Date(w.date);
-            return d >= wStart && d < wEnd;
-          });
-          const weekTotal = weekWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
-          if (weekTotal >= goal.targetValue) successfulWeeks++;
+        // שבועי - חישוב אחוז התקדמות יחסי מתוך היעד השבועי הנוכחי
+        if (goal.targetValue > 0) {
+          persistenceProgress = Math.round((currentProgress / goal.targetValue) * 100);
+          // הגבלה ל-100% לכל היותר אם המשתמש עבר את היעד השבועי
+          if (persistenceProgress > 100) persistenceProgress = 100;
+        } else {
+          persistenceProgress = 0;
         }
-        persistenceProgress = Math.round((successfulWeeks / totalWeeksElapsed) * 100);
       }
 
       const formattedGoal = {
@@ -250,7 +238,7 @@ export class WorkoutsService {
         persistenceProgress: `${persistenceProgress}%`
       };
 
-      // תיקון: חיתוך והשוואת תאריכים נקייה בפורמט YYYY-MM-DD למניעת שגיאות איתור
+      // חיתוך והשוואת תאריכים נקייה בפורמט YYYY-MM-DD
       const cleanToday = todayStr.split('T')[0];
       const cleanEndDate = goal.endDate.split('T')[0];
 
