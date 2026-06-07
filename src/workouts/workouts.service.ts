@@ -158,10 +158,8 @@ export class WorkoutsService {
     const goals = await this.goalsRepository.find({ where: { userId } });
     const workouts = await this.workoutRepository.find({ where: { userId } });
 
-    // סנכרון תאריך נוכחי לפי האימון האחרון או השרת
-    const todayStr = workouts.length > 0 
-      ? workouts.sort((a, b) => b.date.localeCompare(a.date))[0].date 
-      : new Date().toISOString().split('T')[0];
+    // תיקון: חישוב תאריך נוכחי מדויק לפי שעון ישראל (UTC+3) ללא תלות באימונים ישנים/עתידיים
+    const todayStr = new Date(new Date().getTime() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     const active: any[] = [];
     const past: any[] = [];
