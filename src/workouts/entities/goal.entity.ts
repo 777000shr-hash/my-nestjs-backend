@@ -14,27 +14,29 @@ export class Goal {
   user: User;
 
   @Column({ type: 'varchar', nullable: true })
-  goalType: 'CALORIES' | 'REPS'; // סוג היעד
+  goalType: 'CALORIES' | 'REPS';
 
   @Column({ type: 'varchar', nullable: true })
-  periodType: 'DAILY' | 'WEEKLY'; // מחזוריות היעד
+  periodType: 'DAILY' | 'WEEKLY';
 
   @Column({ type: 'int', nullable: true })
-  durationWeeks: number; // מספר שבועות עגול
+  durationWeeks: number;
 
   @Column({ type: 'int', default: 0 })
-  targetValue: number; // ערך היעד
+  targetValue: number;
 
   @Column({ type: 'varchar', nullable: true })
-  startDate: string; // תאריך התחלה
+  startDate: string; // מקבל תאריך ישירות מהפרונט
 
   @Column({ type: 'varchar', nullable: true })
-  endDate: string; // תאריך סיום
+  endDate: string; // מקבל תאריך ישירות מהפרונט (בוטל החישוב האוטומטי)
+
+  @Column({ type: 'json', nullable: true })
+  selectedDays: string[]; // מערך הימים הנבחרים ליעד יומי
 
   @CreateDateColumn()
   createdAt: Date;
 
-  // שדות תאימות לאחור כדי למנוע קריסה של פוסטגרס מול עמודות ישנות בטבלה
   @Column({ type: 'varchar', nullable: true })
   timeFrame: string;
 
