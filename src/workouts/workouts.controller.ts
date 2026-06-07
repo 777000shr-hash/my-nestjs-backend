@@ -30,16 +30,20 @@ export class WorkoutsController {
     return this.workoutsService.getUserStats(userId);
   }
 
-  // 3א. לוח שיאים שבועי - קלוריות (Top 5)
+  // 3א. לוח שיאים שבועי - קלוריות (Top 10 + מיקום נוכחי) - דורש טוקן כעת
+  @UseGuards(JwtAuthGuard)
   @Get('leaderboard/calories')
-  async getCaloriesLeaderboard() {
-    return this.workoutsService.getCaloriesLeaderboard();
+  async getCaloriesLeaderboard(@Req() req: any) {
+    const userId = req.user.userId;
+    return this.workoutsService.getCaloriesLeaderboard(userId);
   }
 
-  // 3ב. לוח שיאים שבועי - חזרות (Top 5)
+  // 3ב. לוח שיאים שבועי - חזרות (Top 10 + מיקום נוכחי) - דורש טוקן כעת
+  @UseGuards(JwtAuthGuard)
   @Get('leaderboard/reps')
-  async getRepsLeaderboard() {
-    return this.workoutsService.getRepsLeaderboard();
+  async getRepsLeaderboard(@Req() req: any) {
+    const userId = req.user.userId;
+    return this.workoutsService.getRepsLeaderboard(userId);
   }
 
   // 4. שליפת היסטוריית אימונים
