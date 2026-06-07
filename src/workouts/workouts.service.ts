@@ -53,7 +53,7 @@ export class WorkoutsService {
     return { userId, totalWorkouts, totalReps, totalCalories };
   }
 
-  // מנגנון עזר משותף לבניית לוח השיאים הכללי (מציג את כל המשתמשים וממיין למציאת דירוג)
+  // מנגנון עזר משותף לבניית לוח השיאים הכללי
   private async buildFullLeaderboardData(metricExtractor: (workouts: Workout[]) => number) {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -80,7 +80,6 @@ export class WorkoutsService {
       })
     );
 
-    // מיון לפי הציון הגבוה, ובמקרה של שוויון לפי תאריך יצירת האימון האחרון
     return leaderboard.sort((a, b) => {
       if (b.score !== a.score) {
         return b.score - a.score;
@@ -92,13 +91,9 @@ export class WorkoutsService {
   // 3א. לוח שיאים - קלוריות (Top 10 + אובייקט מעטפת למשתמש המחובר)
   async getCaloriesLeaderboard(currentUserId: number) {
     const fullBoard = await this.buildFullLeaderboardData((workouts) => workouts.reduce((sum, w) => sum + w.calories, 0));
-    
-    // מציאת הדירוג והנתונים של המשתמש הנוכחי בתוך הרשימה המלאה
     const userIndex = fullBoard.findIndex(u => u.id === currentUserId);
     const userScore = userIndex !== -1 ? fullBoard[userIndex].score : 0;
 
-    // חישוב נפרד של חזרות המשתמש הנוכחי לצורך תצוגת ה-currentUser המלאה
-    const userStats = await this.getUserStats(currentUserId);
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     const formattedDate = oneWeekAgo.toISOString().split('T')[0];
@@ -120,12 +115,9 @@ export class WorkoutsService {
   // 3ב. לוח שיאים - חזרות (Top 10 + אובייקט מעטפת למשתמש המחובר)
   async getRepsLeaderboard(currentUserId: number) {
     const fullBoard = await this.buildFullLeaderboardData((workouts) => workouts.reduce((sum, w) => sum + w.reps, 0));
-    
-    // מציאת הדירוג והנתונים של המשתמש הנוכחי בתוך הרשימה המלאה
     const userIndex = fullBoard.findIndex(u => u.id === currentUserId);
     const userScore = userIndex !== -1 ? fullBoard[userIndex].score : 0;
 
-    // חישוב נפרד של קלוריות המשתמש הנוכחי לצורך תצוגת ה-currentUser המלאה
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     const formattedDate = oneWeekAgo.toISOString().split('T')[0];
@@ -152,21 +144,24 @@ export class WorkoutsService {
     });
   }
 
-  // 5. יצירת יעד חדש - מקבל את כל השדות החדשים והתאריכים ישירות מהפרונטאנד
+  // 5. יצירת יעד חדש
   async createGoal(userId: number, goalData: any) {
     const newGoal = this.goalsRepository.create({
       ...goalData,
       userId,
     });
-
     return await this.goalsRepository.save(newGoal);
   }
 
-  // 6. שליפת יעדים וחישוב התקדמות כפול דינמי בזמן אמת
+  // 6. קבלת היעדים וחישוב התקדמות דינמי ומדויק בזמן אמת (מתוקן)
   async getUserGoals(userId: number) {
     const goals = await this.goalsRepository.find({ where: { userId } });
     const workouts = await this.workoutRepository.find({ where: { userId } });
-    const todayStr = new Date().toISOString().split('T')[0];
+
+    // סנכרון תאריך נוכחי לפי האימון האחרון או השרת
+    const todayStr = workouts.length > 0 
+      ? workouts.sort((a, b) => b.date.localeCompare(a.date))[0].date 
+      : new Date().toISOString().split('T')[0];
 
     const active: any[] = [];
     const past: any[] = [];
@@ -180,15 +175,15 @@ export class WorkoutsService {
         const todayWorkouts = workouts.filter(w => w.date === todayStr);
         currentProgress = todayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
       } else {
-        // שבועי - סכימת השבוע הנוכחי בתוך טווח היעד
-        const oneWeekAgo = new Date();
+        // שבועי
+        const oneWeekAgo = new Date(todayStr);
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
         const limitDate = oneWeekAgo.toISOString().split('T')[0];
         const weeklyWorkouts = workouts.filter(w => w.date >= limitDate && w.date >= goal.startDate && w.date <= goal.endDate);
         currentProgress = weeklyWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
       }
 
-      // ב. חישוב התמדה כללית (persistenceProgress)
+      // ב. חישוב התמדה כללית (persistenceProgress) לפי ימים נבחרים
       let persistenceProgress = 0;
       const start = new Date(goal.startDate);
       const end = new Date(goal.endDate);
@@ -196,20 +191,38 @@ export class WorkoutsService {
       const currentEvaluationDate = today < end ? today : end;
 
       if (goal.periodType === 'DAILY') {
-        let totalDaysElapsed = Math.floor((currentEvaluationDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        if (totalDaysElapsed < 1) totalDaysElapsed = 1;
+        const totalDaysElapsed = Math.floor((currentEvaluationDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         
+        let targetDaysCount = 0;
         let successfulDays = 0;
+        const dayNamesMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
         for (let i = 0; i < totalDaysElapsed; i++) {
           const d = new Date(start);
           d.setDate(d.getDate() + i);
           const currentDayStr = d.toISOString().split('T')[0];
-          
+          const currentDayName = dayNamesMap[d.getDay()];
+
+          // סינון לפי הימים שהמשתמש בחר ביעד
+          if (goal.selectedDays && goal.selectedDays.length > 0) {
+            if (!goal.selectedDays.includes(currentDayName)) {
+              continue; 
+            }
+          }
+
+          targetDaysCount++;
+
           const dayWorkouts = workouts.filter(w => w.date === currentDayStr);
           const dayTotal = dayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
-          if (dayTotal >= goal.targetValue) successfulDays++;
+          if (dayTotal >= goal.targetValue) {
+            successfulDays++;
+          }
         }
-        persistenceProgress = Math.round((successfulDays / totalDaysElapsed) * 100);
+
+        persistenceProgress = targetDaysCount > 0 
+          ? Math.round((successfulDays / targetDaysCount) * 100) 
+          : 0;
+
       } else {
         // שבועי
         const totalWeeksElapsed = goal.durationWeeks || 1;
