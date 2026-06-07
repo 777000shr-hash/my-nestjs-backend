@@ -235,7 +235,7 @@ export class WorkoutsService {
       const formattedGoal = {
         ...goal,
         currentProgress,
-        persistenceProgress: `${persistenceProgress}%`
+        persistenceProgress: persistenceProgress
       };
 
       // חיתוך והשוואת תאריכים נקייה בפורמט YYYY-MM-DD
