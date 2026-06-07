@@ -53,8 +53,8 @@ export class WorkoutsService {
     return { userId, totalWorkouts, totalReps, totalCalories };
   }
 
-  // מנגנון עזר משותף לשוברי שוויון בלוח השיאים
-  private async getLeaderboardBase(metricExtractor: (workouts: Workout[]) => number) {
+  // מנגנון עזר משותף לבניית לוח השיאים הכללי (מציג את כל המשתמשים וממיין למציאת דירוג)
+  private async buildFullLeaderboardData(metricExtractor: (workouts: Workout[]) => number) {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     const formattedDate = oneWeekAgo.toISOString().split('T')[0];
@@ -81,27 +81,67 @@ export class WorkoutsService {
     );
 
     // מיון לפי הציון הגבוה, ובמקרה של שוויון לפי תאריך יצירת האימון האחרון
-    return leaderboard
-      .sort((a, b) => {
-        if (b.score !== a.score) {
-          return b.score - a.score;
-        }
-        return b.lastWorkoutTime - a.lastWorkoutTime;
-      })
-      .slice(0, 5)
-      .map(({ id, username, score }) => ({ id, username, value: score }));
+    return leaderboard.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return b.lastWorkoutTime - a.lastWorkoutTime;
+    });
   }
 
-  // 3א. לוח שיאים - קלוריות
-  async getCaloriesLeaderboard() {
-    const board = await this.getLeaderboardBase((workouts) => workouts.reduce((sum, w) => sum + w.calories, 0));
-    return board.map(u => ({ id: u.id, username: u.username, weeklyCalories: u.value }));
+  // 3א. לוח שיאים - קלוריות (Top 10 + אובייקט מעטפת למשתמש המחובר)
+  async getCaloriesLeaderboard(currentUserId: number) {
+    const fullBoard = await this.buildFullLeaderboardData((workouts) => workouts.reduce((sum, w) => sum + w.calories, 0));
+    
+    // מציאת הדירוג והנתונים של המשתמש הנוכחי בתוך הרשימה המלאה
+    const userIndex = fullBoard.findIndex(u => u.id === currentUserId);
+    const userScore = userIndex !== -1 ? fullBoard[userIndex].score : 0;
+
+    // חישוב נפרד של חזרות המשתמש הנוכחי לצורך תצוגת ה-currentUser המלאה
+    const userStats = await this.getUserStats(currentUserId);
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const formattedDate = oneWeekAgo.toISOString().split('T')[0];
+    const userWeeklyWorkouts = await this.workoutRepository.find({
+      where: { userId: currentUserId, date: MoreThanOrEqual(formattedDate) }
+    });
+    const userWeeklyReps = userWeeklyWorkouts.reduce((sum, w) => sum + w.reps, 0);
+
+    return {
+      leaderboard: fullBoard.slice(0, 10).map(({ id, username, score }) => ({ id, username, weeklyCalories: score })),
+      currentUser: {
+        rank: userIndex !== -1 ? userIndex + 1 : fullBoard.length + 1,
+        weeklyCalories: userScore,
+        weeklyReps: userWeeklyReps
+      }
+    };
   }
 
-  // 3ב. לוח שיאים - חזרות
-  async getRepsLeaderboard() {
-    const board = await this.getLeaderboardBase((workouts) => workouts.reduce((sum, w) => sum + w.reps, 0));
-    return board.map(u => ({ id: u.id, username: u.username, weeklyReps: u.value }));
+  // 3ב. לוח שיאים - חזרות (Top 10 + אובייקט מעטפת למשתמש המחובר)
+  async getRepsLeaderboard(currentUserId: number) {
+    const fullBoard = await this.buildFullLeaderboardData((workouts) => workouts.reduce((sum, w) => sum + w.reps, 0));
+    
+    // מציאת הדירוג והנתונים של המשתמש הנוכחי בתוך הרשימה המלאה
+    const userIndex = fullBoard.findIndex(u => u.id === currentUserId);
+    const userScore = userIndex !== -1 ? fullBoard[userIndex].score : 0;
+
+    // חישוב נפרד של קלוריות המשתמש הנוכחי לצורך תצוגת ה-currentUser המלאה
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const formattedDate = oneWeekAgo.toISOString().split('T')[0];
+    const userWeeklyWorkouts = await this.workoutRepository.find({
+      where: { userId: currentUserId, date: MoreThanOrEqual(formattedDate) }
+    });
+    const userWeeklyCalories = userWeeklyWorkouts.reduce((sum, w) => sum + w.calories, 0);
+
+    return {
+      leaderboard: fullBoard.slice(0, 10).map(({ id, username, score }) => ({ id, username, weeklyReps: score })),
+      currentUser: {
+        rank: userIndex !== -1 ? userIndex + 1 : fullBoard.length + 1,
+        weeklyCalories: userWeeklyCalories,
+        weeklyReps: userScore
+      }
+    };
   }
 
   // 4. שליפת היסטוריית אימונים
@@ -112,22 +152,11 @@ export class WorkoutsService {
     });
   }
 
-  // 5. יצירת יעד חדש ללא חסימת חפיפות
+  // 5. יצירת יעד חדש - מקבל את כל השדות החדשים והתאריכים ישירות מהפרונטאנד
   async createGoal(userId: number, goalData: any) {
-    const todayStr = new Date().toISOString().split('T')[0];
-    
-    // אכיפת שבועות עגולים במידה ונבחר שבועי
-    if (goalData.periodType === 'WEEKLY' && goalData.durationWeeks) {
-      const daysNeeded = goalData.durationWeeks * 7;
-      const end = new Date();
-      end.setDate(end.getDate() + daysNeeded);
-      goalData.endDate = end.toISOString().split('T')[0];
-    }
-
     const newGoal = this.goalsRepository.create({
       ...goalData,
       userId,
-      startDate: todayStr, // מוגדר תמיד מהרגע הנוכחי
     });
 
     return await this.goalsRepository.save(newGoal);
@@ -192,7 +221,7 @@ export class WorkoutsService {
           const wEnd = new Date(wStart);
           wEnd.setDate(wEnd.getDate() + 7);
 
-          if (wStart > today) break; // השבוע עוד לא התחיל
+          if (wStart > today) break;
 
           const weekWorkouts = workouts.filter(w => {
             const d = new Date(w.date);
@@ -217,7 +246,6 @@ export class WorkoutsService {
       }
     }
 
-    // מיון פנימי מהחדש לישן
     active.sort((a, b) => b.startDate.localeCompare(a.startDate));
     past.sort((a, b) => b.startDate.localeCompare(a.startDate));
 
