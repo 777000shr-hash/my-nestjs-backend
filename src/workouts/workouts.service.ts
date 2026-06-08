@@ -166,12 +166,18 @@ export class WorkoutsService {
 
     for (const goal of goals) {
       const isCalories = goal.goalType === 'CALORIES';
+      const goalCreatedAtTime = new Date(goal.createdAt).getTime();
       
       // א. חישוב התקדמות נקודתית (currentProgress)
       let currentProgress = 0;
       if (goal.periodType === 'DAILY') {
-        // תיקון: חותכים את ה-T מהתאריך של האימון לצורך השוואה נקייה ליום הנוכחי
-        const todayWorkouts = workouts.filter(w => w.date.split('T')[0] === todayStr);
+        const todayWorkouts = workouts.filter(w => {
+          const cleanWorkoutDate = w.date.split('T')[0];
+          const workoutCreatedAtTime = new Date(w.createdAt).getTime();
+          
+          // בדיקה שהאימון מהיום ובנוסף בוצע לאחר שעת יצירת היעד
+          return cleanWorkoutDate === todayStr && workoutCreatedAtTime >= goalCreatedAtTime;
+        });
         currentProgress = todayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
       } else {
         // שבועי
@@ -179,17 +185,32 @@ export class WorkoutsService {
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
         const limitDate = oneWeekAgo.toISOString().split('T')[0];
 
-        // תיקון: חותכים את ה-T מכל התאריכים (אימונים ויעדים) כדי לבצע השוואת טווחים תקינה ללא שעות
         const weeklyWorkouts = workouts.filter(w => {
           const cleanWorkoutDate = w.date.split('T')[0];
           const cleanGoalStart = goal.startDate.split('T')[0];
           const cleanGoalEnd = goal.endDate.split('T')[0];
+          const workoutCreatedAtTime = new Date(w.createdAt).getTime();
 
-          return cleanWorkoutDate >= limitDate && 
-                 cleanWorkoutDate >= cleanGoalStart && 
-                 cleanWorkoutDate <= cleanGoalEnd;
+          // סינון בסיסי לפי תאריכים
+          const isInDateRange = cleanWorkoutDate >= limitDate && 
+                                cleanWorkoutDate >= cleanGoalStart && 
+                                cleanWorkoutDate <= cleanGoalEnd;
+
+          if (!isInDateRange) return false;
+
+          // אם האימון בוצע ביום תחילת היעד - נוודא שבוצע לאחר שעת יצירת היעד
+          if (cleanWorkoutDate === cleanGoalStart) {
+            return workoutCreatedAtTime >= goalCreatedAtTime;
+          }
+
+          return true;
         });
         currentProgress = weeklyWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
+      }
+
+      // תיקון 2: חסימת currentProgress שלא יעקוף את ה-targetValue המוגדר
+      if (goal.targetValue > 0 && currentProgress > goal.targetValue) {
+        currentProgress = goal.targetValue;
       }
 
       // ב. חישוב התמדה ואחוזי התקדמות (persistenceProgress)
@@ -212,7 +233,6 @@ export class WorkoutsService {
           const currentDayStr = d.toISOString().split('T')[0];
           const currentDayName = dayNamesMap[d.getDay()];
 
-          // סינון לפי הימים שהמשתמש בחר ביעד
           if (goal.selectedDays && goal.selectedDays.length > 0) {
             if (!goal.selectedDays.includes(currentDayName)) {
               continue; 
@@ -221,8 +241,17 @@ export class WorkoutsService {
 
           targetDaysCount++;
 
-          // תיקון: חותכים את ה-T מהתאריך של האימון גם בתוך לולאת הימים
-          const dayWorkouts = workouts.filter(w => w.date.split('T')[0] === currentDayStr);
+          const dayWorkouts = workouts.filter(w => {
+            const cleanWorkoutDate = w.date.split('T')[0];
+            const workoutCreatedAtTime = new Date(w.createdAt).getTime();
+            
+            // גם בחישוב הימים - אם זה יום יצירת היעד, נספור רק מה שקרה אחריו
+            if (cleanWorkoutDate === goal.startDate.split('T')[0]) {
+              return cleanWorkoutDate === currentDayStr && workoutCreatedAtTime >= goalCreatedAtTime;
+            }
+            return cleanWorkoutDate === currentDayStr;
+          });
+
           const dayTotal = dayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
           if (dayTotal >= goal.targetValue) {
             successfulDays++;
@@ -234,10 +263,9 @@ export class WorkoutsService {
           : 0;
 
       } else {
-        // שבועי - חישוב אחוז התקדמות יחסי מתוך היעד השבועי הנוכחי
+        // שבועי - מחושב מתוך ה-currentProgress שכבר חסום ב-targetValue
         if (goal.targetValue > 0) {
           persistenceProgress = Math.round((currentProgress / goal.targetValue) * 100);
-          // הגבלה ל-100% לכל היותר אם המשתמש עבר את היעד השבועי
           if (persistenceProgress > 100) persistenceProgress = 100;
         } else {
           persistenceProgress = 0;
@@ -250,7 +278,6 @@ export class WorkoutsService {
         persistenceProgress: persistenceProgress
       };
 
-      // חיתוך והשוואת תאריכים נקייה בפורמט YYYY-MM-DD
       const cleanToday = todayStr.split('T')[0];
       const cleanEndDate = goal.endDate.split('T')[0];
 
