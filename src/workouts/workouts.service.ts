@@ -171,15 +171,15 @@ export class WorkoutsService {
       const cleanGoalStart = goal.startDate.split('T')[0];
       const cleanGoalEnd = goal.endDate.split('T')[0];
 
-      // א. חישוב התקדמות נקודתית (currentProgress)
-      let currentProgress = 0;
+      // א. חישוב כמות פיזית נוכחית לצורך אחוזי ה-currentProgress
+      let rawCurrentValue = 0;
       if (goal.periodType === 'DAILY') {
         const todayWorkouts = workouts.filter(w => {
           const cleanWorkoutDate = w.date.split('T')[0];
           const workoutCreatedAtTime = new Date(w.createdAt).getTime();
           return cleanWorkoutDate === todayStr && workoutCreatedAtTime >= goalCreatedAtTime;
         });
-        currentProgress = todayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
+        rawCurrentValue = todayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
       } else {
         // שבועי
         const oneWeekAgo = new Date(todayStr);
@@ -201,31 +201,81 @@ export class WorkoutsService {
           }
           return true;
         });
-        currentProgress = weeklyWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
+        rawCurrentValue = weeklyWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
       }
 
-      // חסימת הציון המספרי של החזרות שלא יעקוף את היעד עצמו
-      let displayProgress = currentProgress;
-      if (goal.targetValue > 0 && displayProgress > goal.targetValue) {
-        displayProgress = goal.targetValue;
-      }
-
-      // ב. חישוב אחוזי התקדמות (persistenceProgress)
-      let persistenceProgress = 0;
+      // הפיכת currentProgress לאחוזים (0-100%) מהיעד הנוכחי
+      let currentProgressPercentage = 0;
       if (goal.targetValue > 0) {
-        persistenceProgress = Math.round((currentProgress / goal.targetValue) * 100);
-        if (persistenceProgress > 100) {
-          persistenceProgress = 100;
+        currentProgressPercentage = Math.round((rawCurrentValue / goal.targetValue) * 100);
+        if (currentProgressPercentage > 100) {
+          currentProgressPercentage = 100;
         }
       }
 
-      // נרמול שדות התאריך המוחזרים כדי למנוע בעיות תצוגה וכפתורים חסומים באתר
+      // ב. חישוב התמדה (persistenceProgress) - בדיקת עמידה ביעדים לאורך ימים שעברו
+      let persistenceProgress = 0;
+      const start = new Date(cleanGoalStart);
+      const end = new Date(cleanGoalEnd);
+      const today = new Date(todayStr);
+      const currentEvaluationDate = today < end ? today : end;
+
+      if (goal.periodType === 'DAILY') {
+        // חישוב כמות הימים שעברו מתחילת היעד ועד היום (כולל)
+        const totalDaysElapsed = Math.floor((currentEvaluationDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        
+        let targetDaysCount = 0;
+        let successfulDays = 0;
+        const dayNamesMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+        for (let i = 0; i < totalDaysElapsed; i++) {
+          const d = new Date(start);
+          d.setDate(d.getDate() + i);
+          const currentDayStr = d.toISOString().split('T')[0];
+          const currentDayName = dayNamesMap[d.getDay()];
+
+          // סינון לפי הימים שהמשתמש הגדיר עבור היעד
+          if (goal.selectedDays && goal.selectedDays.length > 0) {
+            if (!goal.selectedDays.includes(currentDayName)) {
+              continue; 
+            }
+          }
+
+          targetDaysCount++;
+
+          const dayWorkouts = workouts.filter(w => {
+            const cleanWorkoutDate = w.date.split('T')[0];
+            const workoutCreatedAtTime = new Date(w.createdAt).getTime();
+            
+            if (cleanWorkoutDate === cleanGoalStart) {
+              return cleanWorkoutDate === currentDayStr && workoutCreatedAtTime >= goalCreatedAtTime;
+            }
+            return cleanWorkoutDate === currentDayStr;
+          });
+
+          const dayTotal = dayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
+          
+          // יום נחשב מוצלח אך ורק אם המשתמש הגיע ל-100% מהמכסה היומית שלו באותו יום
+          if (dayTotal >= goal.targetValue) {
+            successfulDays++;
+          }
+        }
+
+        persistenceProgress = targetDaysCount > 0 
+          ? Math.round((successfulDays / targetDaysCount) * 100) 
+          : 0;
+
+      } else {
+        // שבועי - אחוז ההתמדה השבועי זהה לאחוז ההתקדמות הכללי של השבוע הנוכחי
+        persistenceProgress = currentProgressPercentage;
+      }
+
       const formattedGoal = {
         ...goal,
         startDate: cleanGoalStart,
         endDate: cleanGoalEnd,
-        currentProgress: displayProgress,
-        persistenceProgress: persistenceProgress
+        currentProgress: currentProgressPercentage, // מחזיר אחוזים (0-100)
+        persistenceProgress: persistenceProgress      // מחזיר אחוז התמדה (0-100)
       };
 
       if (todayStr <= cleanGoalEnd) {
