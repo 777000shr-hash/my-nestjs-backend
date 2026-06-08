@@ -120,7 +120,7 @@ export class WorkoutsService {
 
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const formattedDate = oneWeekAgo.toISOString().split('T')[0];
+    const formattedDate = new Date().toISOString().split('T')[0];
     const userWeeklyWorkouts = await this.workoutRepository.find({
       where: { userId: currentUserId, date: MoreThanOrEqual(formattedDate) }
     });
@@ -158,7 +158,6 @@ export class WorkoutsService {
     const goals = await this.goalsRepository.find({ where: { userId } });
     const workouts = await this.workoutRepository.find({ where: { userId } });
 
-    // חישוב תאריך נוכחי מדויק לפי שעון ישראל (UTC+3) ללא תלות באימונים
     const todayStr = new Date(new Date().getTime() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     const active: any[] = [];
@@ -174,8 +173,6 @@ export class WorkoutsService {
         const todayWorkouts = workouts.filter(w => {
           const cleanWorkoutDate = w.date.split('T')[0];
           const workoutCreatedAtTime = new Date(w.createdAt).getTime();
-          
-          // בדיקה שהאימון מהיום ובנוסף בוצע לאחר שעת יצירת היעד
           return cleanWorkoutDate === todayStr && workoutCreatedAtTime >= goalCreatedAtTime;
         });
         currentProgress = todayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
@@ -191,90 +188,38 @@ export class WorkoutsService {
           const cleanGoalEnd = goal.endDate.split('T')[0];
           const workoutCreatedAtTime = new Date(w.createdAt).getTime();
 
-          // סינון בסיסי לפי תאריכים
           const isInDateRange = cleanWorkoutDate >= limitDate && 
                                 cleanWorkoutDate >= cleanGoalStart && 
                                 cleanWorkoutDate <= cleanGoalEnd;
 
           if (!isInDateRange) return false;
 
-          // אם האימון בוצע ביום תחילת היעד - נוודא שבוצע לאחר שעת יצירת היעד
           if (cleanWorkoutDate === cleanGoalStart) {
             return workoutCreatedAtTime >= goalCreatedAtTime;
           }
-
           return true;
         });
         currentProgress = weeklyWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
       }
 
-      // תיקון 2: חסימת currentProgress שלא יעקוף את ה-targetValue המוגדר
-      if (goal.targetValue > 0 && currentProgress > goal.targetValue) {
-        currentProgress = goal.targetValue;
+      // חסימת הציון המספרי של החזרות שלא יעקוף את היעד עצמו ב-currentProgress
+      let displayProgress = currentProgress;
+      if (goal.targetValue > 0 && displayProgress > goal.targetValue) {
+        displayProgress = goal.targetValue;
       }
 
-      // ב. חישוב התמדה ואחוזי התקדמות (persistenceProgress)
+      // ב. חישוב אחוזי התקדמות (persistenceProgress) - מעודכן לחיווי ליניארי בשניהם
       let persistenceProgress = 0;
-      const start = new Date(goal.startDate);
-      const end = new Date(goal.endDate);
-      const today = new Date(todayStr);
-      const currentEvaluationDate = today < end ? today : end;
-
-      if (goal.periodType === 'DAILY') {
-        const totalDaysElapsed = Math.floor((currentEvaluationDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        
-        let targetDaysCount = 0;
-        let successfulDays = 0;
-        const dayNamesMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-        for (let i = 0; i < totalDaysElapsed; i++) {
-          const d = new Date(start);
-          d.setDate(d.getDate() + i);
-          const currentDayStr = d.toISOString().split('T')[0];
-          const currentDayName = dayNamesMap[d.getDay()];
-
-          if (goal.selectedDays && goal.selectedDays.length > 0) {
-            if (!goal.selectedDays.includes(currentDayName)) {
-              continue; 
-            }
-          }
-
-          targetDaysCount++;
-
-          const dayWorkouts = workouts.filter(w => {
-            const cleanWorkoutDate = w.date.split('T')[0];
-            const workoutCreatedAtTime = new Date(w.createdAt).getTime();
-            
-            // גם בחישוב הימים - אם זה יום יצירת היעד, נספור רק מה שקרה אחריו
-            if (cleanWorkoutDate === goal.startDate.split('T')[0]) {
-              return cleanWorkoutDate === currentDayStr && workoutCreatedAtTime >= goalCreatedAtTime;
-            }
-            return cleanWorkoutDate === currentDayStr;
-          });
-
-          const dayTotal = dayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
-          if (dayTotal >= goal.targetValue) {
-            successfulDays++;
-          }
-        }
-
-        persistenceProgress = targetDaysCount > 0 
-          ? Math.round((successfulDays / targetDaysCount) * 100) 
-          : 0;
-
-      } else {
-        // שבועי - מחושב מתוך ה-currentProgress שכבר חסום ב-targetValue
-        if (goal.targetValue > 0) {
-          persistenceProgress = Math.round((currentProgress / goal.targetValue) * 100);
-          if (persistenceProgress > 100) persistenceProgress = 100;
-        } else {
-          persistenceProgress = 0;
+      if (goal.targetValue > 0) {
+        persistenceProgress = Math.round((currentProgress / goal.targetValue) * 100);
+        if (persistenceProgress > 100) {
+          persistenceProgress = 100;
         }
       }
 
       const formattedGoal = {
         ...goal,
-        currentProgress,
+        currentProgress: displayProgress,
         persistenceProgress: persistenceProgress
       };
 
