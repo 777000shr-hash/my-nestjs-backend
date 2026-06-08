@@ -158,6 +158,7 @@ export class WorkoutsService {
     const goals = await this.goalsRepository.find({ where: { userId } });
     const workouts = await this.workoutRepository.find({ where: { userId } });
 
+    // תאריך נוכחי נקי בישראל (YYYY-MM-DD)
     const todayStr = new Date(new Date().getTime() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     const active: any[] = [];
@@ -167,6 +168,9 @@ export class WorkoutsService {
       const isCalories = goal.goalType === 'CALORIES';
       const goalCreatedAtTime = new Date(goal.createdAt).getTime();
       
+      const cleanGoalStart = goal.startDate.split('T')[0];
+      const cleanGoalEnd = goal.endDate.split('T')[0];
+
       // א. חישוב התקדמות נקודתית (currentProgress)
       let currentProgress = 0;
       if (goal.periodType === 'DAILY') {
@@ -184,8 +188,6 @@ export class WorkoutsService {
 
         const weeklyWorkouts = workouts.filter(w => {
           const cleanWorkoutDate = w.date.split('T')[0];
-          const cleanGoalStart = goal.startDate.split('T')[0];
-          const cleanGoalEnd = goal.endDate.split('T')[0];
           const workoutCreatedAtTime = new Date(w.createdAt).getTime();
 
           const isInDateRange = cleanWorkoutDate >= limitDate && 
@@ -202,13 +204,13 @@ export class WorkoutsService {
         currentProgress = weeklyWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
       }
 
-      // חסימת הציון המספרי של החזרות שלא יעקוף את היעד עצמו ב-currentProgress
+      // חסימת הציון המספרי של החזרות שלא יעקוף את היעד עצמו
       let displayProgress = currentProgress;
       if (goal.targetValue > 0 && displayProgress > goal.targetValue) {
         displayProgress = goal.targetValue;
       }
 
-      // ב. חישוב אחוזי התקדמות (persistenceProgress) - מעודכן לחיווי ליניארי בשניהם
+      // ב. חישוב אחוזי התקדמות (persistenceProgress)
       let persistenceProgress = 0;
       if (goal.targetValue > 0) {
         persistenceProgress = Math.round((currentProgress / goal.targetValue) * 100);
@@ -217,16 +219,16 @@ export class WorkoutsService {
         }
       }
 
+      // נרמול שדות התאריך המוחזרים כדי למנוע בעיות תצוגה וכפתורים חסומים באתר
       const formattedGoal = {
         ...goal,
+        startDate: cleanGoalStart,
+        endDate: cleanGoalEnd,
         currentProgress: displayProgress,
         persistenceProgress: persistenceProgress
       };
 
-      const cleanToday = todayStr.split('T')[0];
-      const cleanEndDate = goal.endDate.split('T')[0];
-
-      if (cleanToday <= cleanEndDate) {
+      if (todayStr <= cleanGoalEnd) {
         active.push(formattedGoal);
       } else {
         past.push(formattedGoal);
