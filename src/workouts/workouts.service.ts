@@ -88,7 +88,7 @@ export class WorkoutsService {
     });
   }
 
-  // 3א. לוח שיאים - קלוריות (Top 10 + אובייקט מעטפת למשתמש המחובר)
+  // 3א. לוח שיאים - קלוריות
   async getCaloriesLeaderboard(currentUserId: number) {
     const fullBoard = await this.buildFullLeaderboardData((workouts) => workouts.reduce((sum, w) => sum + w.calories, 0));
     const userIndex = fullBoard.findIndex(u => u.id === currentUserId);
@@ -112,7 +112,7 @@ export class WorkoutsService {
     };
   }
 
-  // 3ב. לוח שיאים - חזרות (Top 10 + אובייקט מעטפת למשתמש המחובר)
+  // 3ב. לוח שיאים - חזרות
   async getRepsLeaderboard(currentUserId: number) {
     const fullBoard = await this.buildFullLeaderboardData((workouts) => workouts.reduce((sum, w) => sum + w.reps, 0));
     const userIndex = fullBoard.findIndex(u => u.id === currentUserId);
@@ -158,7 +158,6 @@ export class WorkoutsService {
     const goals = await this.goalsRepository.find({ where: { userId } });
     const workouts = await this.workoutRepository.find({ where: { userId } });
 
-    // תאריך נוכחי נקי בישראל (YYYY-MM-DD)
     const todayStr = new Date(new Date().getTime() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     const active: any[] = [];
@@ -171,7 +170,6 @@ export class WorkoutsService {
       const cleanGoalStart = goal.startDate.split('T')[0];
       const cleanGoalEnd = goal.endDate.split('T')[0];
 
-      // א. חישוב כמות פיזית נוכחית לצורך אחוזי ה-currentProgress
       let rawCurrentValue = 0;
       if (goal.periodType === 'DAILY') {
         const todayWorkouts = workouts.filter(w => {
@@ -181,7 +179,6 @@ export class WorkoutsService {
         });
         rawCurrentValue = todayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
       } else {
-        // שבועי
         const oneWeekAgo = new Date(todayStr);
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
         const limitDate = oneWeekAgo.toISOString().split('T')[0];
@@ -204,16 +201,12 @@ export class WorkoutsService {
         rawCurrentValue = weeklyWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
       }
 
-      // הפיכת currentProgress לאחוזים (0-100%) מהיעד הנוכחי
       let currentProgressPercentage = 0;
       if (goal.targetValue > 0) {
         currentProgressPercentage = Math.round((rawCurrentValue / goal.targetValue) * 100);
-        if (currentProgressPercentage > 100) {
-          currentProgressPercentage = 100;
-        }
+        if (currentProgressPercentage > 100) currentProgressPercentage = 100;
       }
 
-      // ב. חישוב התמדה (persistenceProgress) - בדיקת עמידה ביעדים לאורך ימים שעברו
       let persistenceProgress = 0;
       const start = new Date(cleanGoalStart);
       const end = new Date(cleanGoalEnd);
@@ -221,9 +214,7 @@ export class WorkoutsService {
       const currentEvaluationDate = today < end ? today : end;
 
       if (goal.periodType === 'DAILY') {
-        // חישוב כמות הימים שעברו מתחילת היעד ועד היום (כולל)
         const totalDaysElapsed = Math.floor((currentEvaluationDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        
         let targetDaysCount = 0;
         let successfulDays = 0;
         const dayNamesMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -234,19 +225,14 @@ export class WorkoutsService {
           const currentDayStr = d.toISOString().split('T')[0];
           const currentDayName = dayNamesMap[d.getDay()];
 
-          // סינון לפי הימים שהמשתמש הגדיר עבור היעד
           if (goal.selectedDays && goal.selectedDays.length > 0) {
-            if (!goal.selectedDays.includes(currentDayName)) {
-              continue; 
-            }
+            if (!goal.selectedDays.includes(currentDayName)) continue; 
           }
-
           targetDaysCount++;
 
           const dayWorkouts = workouts.filter(w => {
             const cleanWorkoutDate = w.date.split('T')[0];
             const workoutCreatedAtTime = new Date(w.createdAt).getTime();
-            
             if (cleanWorkoutDate === cleanGoalStart) {
               return cleanWorkoutDate === currentDayStr && workoutCreatedAtTime >= goalCreatedAtTime;
             }
@@ -254,19 +240,10 @@ export class WorkoutsService {
           });
 
           const dayTotal = dayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
-          
-          // יום נחשב מוצלח אך ורק אם המשתמש הגיע ל-100% מהמכסה היומית שלו באותו יום
-          if (dayTotal >= goal.targetValue) {
-            successfulDays++;
-          }
+          if (dayTotal >= goal.targetValue) successfulDays++;
         }
-
-        persistenceProgress = targetDaysCount > 0 
-          ? Math.round((successfulDays / targetDaysCount) * 100) 
-          : 0;
-
+        persistenceProgress = targetDaysCount > 0 ? Math.round((successfulDays / targetDaysCount) * 100) : 0;
       } else {
-        // שבועי - אחוז ההתמדה השבועי זהה לאחוז ההתקדמות הכללי של השבוע הנוכחי
         persistenceProgress = currentProgressPercentage;
       }
 
@@ -274,8 +251,9 @@ export class WorkoutsService {
         ...goal,
         startDate: cleanGoalStart,
         endDate: cleanGoalEnd,
-        currentProgress: currentProgressPercentage, // מחזיר אחוזים (0-100)
-        persistenceProgress: persistenceProgress      // מחזיר אחוז התמדה (0-100)
+        currentProgress: currentProgressPercentage,
+        persistenceProgress: persistenceProgress,
+        isCompleted: persistenceProgress >= 100 // חיווי של מושלם
       };
 
       if (todayStr <= cleanGoalEnd) {
