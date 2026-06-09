@@ -247,16 +247,19 @@ export class WorkoutsService {
         persistenceProgress = currentProgressPercentage;
       }
 
+      const isCompleted = persistenceProgress >= 100;
+
       const formattedGoal = {
         ...goal,
         startDate: cleanGoalStart,
         endDate: cleanGoalEnd,
         currentProgress: currentProgressPercentage,
         persistenceProgress: persistenceProgress,
-        isCompleted: persistenceProgress >= 100 // חיווי של מושלם
+        isCompleted: isCompleted
       };
 
-      if (todayStr <= cleanGoalEnd) {
+      // פיצול המערכים: יעד עובר ל-past אם תאריך היעד חלף, או אם הוא הושלם ב-100%
+      if (todayStr <= cleanGoalEnd && !isCompleted) {
         active.push(formattedGoal);
       } else {
         past.push(formattedGoal);
