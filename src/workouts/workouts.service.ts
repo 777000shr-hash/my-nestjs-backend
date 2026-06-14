@@ -53,18 +53,21 @@ export class WorkoutsService {
     return { userId, totalWorkouts, totalReps, totalCalories };
   }
 
-  // מנגנון עזר משותף לבניית לוח השיאים הכללי
+  // מנגנון עזר משותף לבניית לוח השיאים הכללי - מסונן לפי שבוע דינמי אמיתי (createdAt)
   private async buildFullLeaderboardData(metricExtractor: (workouts: Workout[]) => number) {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const formattedDate = oneWeekAgo.toISOString().split('T')[0];
 
     const users = await this.userRepository.find();
     
     const leaderboard = await Promise.all(
       users.map(async (user) => {
+        // סינון קשוח מול מסד הנתונים שחוסך שליפת אימונים ישנים
         const weeklyWorkouts = await this.workoutRepository.find({
-          where: { userId: user.id, date: MoreThanOrEqual(formattedDate) },
+          where: { 
+            userId: user.id, 
+            createdAt: MoreThanOrEqual(oneWeekAgo) 
+          },
           order: { createdAt: 'DESC' }
         });
 
@@ -96,9 +99,11 @@ export class WorkoutsService {
 
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const formattedDate = oneWeekAgo.toISOString().split('T')[0];
     const userWeeklyWorkouts = await this.workoutRepository.find({
-      where: { userId: currentUserId, date: MoreThanOrEqual(formattedDate) }
+      where: { 
+        userId: currentUserId, 
+        createdAt: MoreThanOrEqual(oneWeekAgo) 
+      }
     });
     const userWeeklyReps = userWeeklyWorkouts.reduce((sum, w) => sum + w.reps, 0);
 
@@ -120,9 +125,11 @@ export class WorkoutsService {
 
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const formattedDate = new Date().toISOString().split('T')[0];
     const userWeeklyWorkouts = await this.workoutRepository.find({
-      where: { userId: currentUserId, date: MoreThanOrEqual(formattedDate) }
+      where: { 
+        userId: currentUserId, 
+        createdAt: MoreThanOrEqual(oneWeekAgo) 
+      }
     });
     const userWeeklyCalories = userWeeklyWorkouts.reduce((sum, w) => sum + w.calories, 0);
 
@@ -173,115 +180,4 @@ export class WorkoutsService {
       let rawCurrentValue = 0;
       if (goal.periodType === 'DAILY') {
         const todayWorkouts = workouts.filter(w => {
-          const cleanWorkoutDate = w.date.split('T')[0];
-          const workoutCreatedAtTime = new Date(w.createdAt).getTime();
-          return cleanWorkoutDate === todayStr && workoutCreatedAtTime >= goalCreatedAtTime;
-        });
-        rawCurrentValue = todayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
-      } else {
-        const oneWeekAgo = new Date(todayStr);
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        const limitDate = oneWeekAgo.toISOString().split('T')[0];
-
-        const weeklyWorkouts = workouts.filter(w => {
-          const cleanWorkoutDate = w.date.split('T')[0];
-          const workoutCreatedAtTime = new Date(w.createdAt).getTime();
-
-          const isInDateRange = cleanWorkoutDate >= limitDate && 
-                                cleanWorkoutDate >= cleanGoalStart && 
-                                cleanWorkoutDate <= cleanGoalEnd;
-
-          if (!isInDateRange) return false;
-
-          if (cleanWorkoutDate === cleanGoalStart) {
-            return workoutCreatedAtTime >= goalCreatedAtTime;
-          }
-          return true;
-        });
-        rawCurrentValue = weeklyWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
-      }
-
-      let currentProgressPercentage = 0;
-      if (goal.targetValue > 0) {
-        currentProgressPercentage = Math.round((rawCurrentValue / goal.targetValue) * 100);
-        if (currentProgressPercentage > 100) currentProgressPercentage = 100;
-      }
-
-      let persistenceProgress = 0;
-      const start = new Date(cleanGoalStart);
-      const end = new Date(cleanGoalEnd);
-      const today = new Date(todayStr);
-      const currentEvaluationDate = today < end ? today : end;
-
-      if (goal.periodType === 'DAILY') {
-        const totalDaysElapsed = Math.floor((currentEvaluationDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        let targetDaysCount = 0;
-        let successfulDays = 0;
-        const dayNamesMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-        for (let i = 0; i < totalDaysElapsed; i++) {
-          const d = new Date(start);
-          d.setDate(d.getDate() + i);
-          const currentDayStr = d.toISOString().split('T')[0];
-          const currentDayName = dayNamesMap[d.getDay()];
-
-          if (goal.selectedDays && goal.selectedDays.length > 0) {
-            if (!goal.selectedDays.includes(currentDayName)) continue; 
-          }
-          targetDaysCount++;
-
-          const dayWorkouts = workouts.filter(w => {
-            const cleanWorkoutDate = w.date.split('T')[0];
-            const workoutCreatedAtTime = new Date(w.createdAt).getTime();
-            if (cleanWorkoutDate === cleanGoalStart) {
-              return cleanWorkoutDate === currentDayStr && workoutCreatedAtTime >= goalCreatedAtTime;
-            }
-            return cleanWorkoutDate === currentDayStr;
-          });
-
-          const dayTotal = dayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
-          if (dayTotal >= goal.targetValue) successfulDays++;
-        }
-        persistenceProgress = targetDaysCount > 0 ? Math.round((successfulDays / targetDaysCount) * 100) : 0;
-      } else {
-        persistenceProgress = currentProgressPercentage;
-      }
-
-      const isCompleted = persistenceProgress >= 100;
-
-      const formattedGoal = {
-        ...goal,
-        startDate: cleanGoalStart,
-        endDate: cleanGoalEnd,
-        currentProgress: currentProgressPercentage,
-        persistenceProgress: persistenceProgress,
-        isCompleted: isCompleted
-      };
-
-      // פיצול המערכים: יעד עובר ל-past אם תאריך היעד חלף, או אם הוא הושלם ב-100%
-      if (todayStr <= cleanGoalEnd && !isCompleted) {
-        active.push(formattedGoal);
-      } else {
-        past.push(formattedGoal);
-      }
-    }
-
-    active.sort((a, b) => b.startDate.localeCompare(a.startDate));
-    past.sort((a, b) => b.startDate.localeCompare(a.startDate));
-
-    return { active, past };
-  }
-
-  // 7. מחיקת יעד אישי
-  async deleteGoal(userId: number, goalId: number) {
-    const goal = await this.goalsRepository.findOne({ where: { id: goalId } });
-    if (!goal) {
-      throw new NotFoundException(`Goal with ID ${goalId} not found`);
-    }
-    if (goal.userId !== userId) {
-      throw new ForbiddenException('אינך מורשה למחוק יעד זה');
-    }
-    await this.goalsRepository.remove(goal);
-    return { success: true, message: 'היעד נמחק בהצלחה' };
-  }
-}
+          const cleanWorkoutDate = w.date.split('T')
