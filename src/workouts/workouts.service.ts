@@ -142,10 +142,16 @@ export class WorkoutsService {
     };
   }
 
-  // 4. שליפת היסטוריית אימונים
+  // 4. שליפת היסטוריית אימונים - מסונן לשנה האחרונה בלבד
   async getWorkoutHistory(userId: number) {
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
     return await this.workoutRepository.find({
-      where: { userId },
+      where: { 
+        userId,
+        createdAt: MoreThanOrEqual(oneYearAgo)
+      },
       order: { createdAt: 'DESC' },
     });
   }
