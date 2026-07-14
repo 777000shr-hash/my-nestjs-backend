@@ -142,8 +142,8 @@ export class WorkoutsService {
     };
   }
 
-  // 4. שליפת היסטוריית אימונים - מסונן לשנה האחרונה בלבד
-  async getWorkoutHistory(userId: number) {
+  // 4. שליפת היסטוריית אימונים - מעודכן ותומך ב-Pagination (ברירת מחדל: מביא 30 אימונים, ללא דילוג)
+  async getWorkoutHistory(userId: number, limit: number = 30, offset: number = 0) {
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
@@ -153,6 +153,8 @@ export class WorkoutsService {
         createdAt: MoreThanOrEqual(oneYearAgo)
       },
       order: { createdAt: 'DESC' },
+      take: limit,   // LIMIT
+      skip: offset,  // OFFSET
     });
   }
 
