@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Delete, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Body, Get, Delete, Param, UseGuards, Req, Query } from '@nestjs/common';
 import { WorkoutsService } from './workouts.service';
 import { JwtAuthGuard } from '../users/jwt-auth.guard';
 
@@ -46,12 +46,18 @@ export class WorkoutsController {
     return this.workoutsService.getRepsLeaderboard(userId);
   }
 
-  // 4. שליפת היסטוריית אימונים
+  // 4. שליפת היסטוריית אימונים - מעודכן עם תמיכה ב-limit ו-offset
   @UseGuards(JwtAuthGuard)
   @Get('history')
-  async getWorkoutHistory(@Req() req: any) {
+  async getWorkoutHistory(
+    @Req() req: any,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
     const userId = req.user.userId;
-    return this.workoutsService.getWorkoutHistory(userId);
+    const parsedLimit = limit ? Number(limit) : 30;
+    const parsedOffset = offset ? Number(offset) : 0;
+    return this.workoutsService.getWorkoutHistory(userId, parsedLimit, parsedOffset);
   }
 
   // 5. יצירת יעד חדש
