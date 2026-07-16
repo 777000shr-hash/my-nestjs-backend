@@ -53,7 +53,7 @@ export class WorkoutsService {
     return { userId, totalWorkouts, totalReps, totalCalories };
   }
 
-  // מנגנון עזר משותף לבניית לוח השיאים הכללי - מסונן לפי שבוע דינמי אמיתי (createdAt)
+  // מנגנון עזר משותף לבניית לוח השיאים הכללי - מסונן לפי שבוע דינמי אמיתי ומסנן משתמשים עם 0 נקודות
   private async buildFullLeaderboardData(metricExtractor: (workouts: Workout[]) => number) {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -82,12 +82,15 @@ export class WorkoutsService {
       })
     );
 
-    return leaderboard.sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      return b.lastWorkoutTime - a.lastWorkoutTime;
-    });
+    // סינון משתמשים ללא אימונים השבוע (ציון מעל 0) ומיון מהגבוה לנמוך
+    return leaderboard
+      .filter(user => user.score > 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        return b.lastWorkoutTime - a.lastWorkoutTime;
+      });
   }
 
   // 3א. לוח שיאים - קלוריות
