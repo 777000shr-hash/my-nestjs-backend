@@ -130,7 +130,7 @@ export class WorkoutsService {
    * Get weekly reps leaderboard (Top 10 & Current User Rank)
    */
   async getRepsLeaderboard(currentUserId: number) {
-    const fullBoard = await this.buildFullLeaderboardData((workouts) => workouts.reduce((sum, w) => sum + w.reps, 0));
+    const fullBoard = await this.buildFullLeaderboardData((workouts) => workouts.reduce((sum, w) => sum + w.calories, 0));
     const userIndex = fullBoard.findIndex(u => u.id === currentUserId);
     const userScore = userIndex !== -1 ? fullBoard[userIndex].score : 0;
 
@@ -305,7 +305,8 @@ export class WorkoutsService {
         isCompleted: isCompleted
       };
 
-      if (todayStr <= cleanGoalEnd && !isCompleted) {
+      // Goals remain active as long as the end date hasn't passed
+      if (todayStr <= cleanGoalEnd) {
         active.push(formattedGoal);
       } else {
         past.push(formattedGoal);
