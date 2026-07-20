@@ -16,7 +16,9 @@ export class WorkoutsService {
     private readonly goalsRepository: Repository<Goal>,
   ) {}
 
-  // 1. שמירת אימון
+  /**
+   * Save a new workout log for a user
+   */
   async addWorkout(
     userId: number, 
     reps: number, 
@@ -43,7 +45,9 @@ export class WorkoutsService {
     return await this.workoutRepository.save(newWorkout);
   }
 
-  // 2. שליפת סטטיסטיקות
+  /**
+   * Get total aggregated statistics for a user
+   */
   async getUserStats(userId: number) {
     const workouts = await this.workoutRepository.find({ where: { userId } });
     const totalWorkouts = workouts.length;
@@ -53,7 +57,9 @@ export class WorkoutsService {
     return { userId, totalWorkouts, totalReps, totalCalories };
   }
 
-  // מנגנון עזר משותף לבניית לוח השיאים הכללי - מסונן לפי שבוע דינמי אמיתי ומסנן משתמשים עם 0 נקודות
+  /**
+   * Helper method to generate weekly leaderboard data for active users
+   */
   private async buildFullLeaderboardData(metricExtractor: (workouts: Workout[]) => number) {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -92,7 +98,9 @@ export class WorkoutsService {
       });
   }
 
-  // 3א. לוח שיאים - קלוריות
+  /**
+   * Get weekly calories leaderboard (Top 10 & Current User Rank)
+   */
   async getCaloriesLeaderboard(currentUserId: number) {
     const fullBoard = await this.buildFullLeaderboardData((workouts) => workouts.reduce((sum, w) => sum + w.calories, 0));
     const userIndex = fullBoard.findIndex(u => u.id === currentUserId);
@@ -118,7 +126,9 @@ export class WorkoutsService {
     };
   }
 
-  // 3ב. לוח שיאים - חזרות
+  /**
+   * Get weekly reps leaderboard (Top 10 & Current User Rank)
+   */
   async getRepsLeaderboard(currentUserId: number) {
     const fullBoard = await this.buildFullLeaderboardData((workouts) => workouts.reduce((sum, w) => sum + w.reps, 0));
     const userIndex = fullBoard.findIndex(u => u.id === currentUserId);
@@ -144,7 +154,9 @@ export class WorkoutsService {
     };
   }
 
-  // 4. שליפת היסטוריית אימונים
+  /**
+   * Retrieve paginated workout history for a specific user
+   */
   async getWorkoutHistory(userId: number, limit: number = 30, offset: number = 0) {
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
@@ -160,7 +172,9 @@ export class WorkoutsService {
     });
   }
 
-  // 5. יצירת יעד חדש
+  /**
+   * Create a new user goal
+   */
   async createGoal(userId: number, goalData: any) {
     const newGoal = this.goalsRepository.create({
       ...goalData,
@@ -169,7 +183,9 @@ export class WorkoutsService {
     return await this.goalsRepository.save(newGoal);
   }
 
-  // 6. קבלת היעדים וחישוב התקדמות מתוקן
+  /**
+   * Retrieve and evaluate progress for active and past goals
+   */
   async getUserGoals(userId: number) {
     const goals = await this.goalsRepository.find({ where: { userId } });
     const workouts = await this.workoutRepository.find({ where: { userId } });
@@ -186,7 +202,6 @@ export class WorkoutsService {
       const cleanGoalStart = goal.startDate.split('T')[0];
       const cleanGoalEnd = goal.endDate.split('T')[0];
 
-      // נורמליזציה לימים שנבחרו (המרת כל הימים לאותיות קטנות למניעת אי-התאמות)
       const normalizedSelectedDays = goal.selectedDays && Array.isArray(goal.selectedDays)
         ? goal.selectedDays.map((d: string) => d.toLowerCase())
         : [];
@@ -201,7 +216,6 @@ export class WorkoutsService {
           
           if (!isToday) return false;
 
-          // אם יש ימים מסוימים שנבחרו, נוודא שהיום הנוכחי מופיע ביניהם
           if (normalizedSelectedDays.length > 0) {
             const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
             return normalizedSelectedDays.some(d => d.includes(todayDayName) || todayDayName.includes(d));
@@ -304,16 +318,18 @@ export class WorkoutsService {
     return { active, past };
   }
 
-  // 7. מחיקת יעד אישי
+  /**
+   * Delete a goal by ID
+   */
   async deleteGoal(userId: number, goalId: number) {
     const goal = await this.goalsRepository.findOne({ where: { id: goalId } });
     if (!goal) {
       throw new NotFoundException(`Goal with ID ${goalId} not found`);
     }
     if (goal.userId !== userId) {
-      throw new ForbiddenException('אינך מורשה למחוק יעד זה');
+      throw new ForbiddenException('Unauthorized to delete this goal');
     }
     await this.goalsRepository.remove(goal);
-    return { success: true, message: 'היעד נמחק בהצלחה' };
+    return { success: true, message: 'Goal deleted successfully' };
   }
 }
