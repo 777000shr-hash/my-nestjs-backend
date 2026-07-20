@@ -82,7 +82,6 @@ export class WorkoutsService {
       })
     );
 
-    // סינון משתמשים ללא אימונים השבוע (ציון מעל 0) ומיון מהגבוה לנמוך
     return leaderboard
       .filter(user => user.score > 0)
       .sort((a, b) => {
@@ -145,7 +144,7 @@ export class WorkoutsService {
     };
   }
 
-  // 4. שליפת היסטוריית אימונים - מעודכן ותומך ב-Pagination (ברירת מחדל: מביא 30 אימונים, ללא דילוג)
+  // 4. שליפת היסטוריית אימונים
   async getWorkoutHistory(userId: number, limit: number = 30, offset: number = 0) {
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
@@ -156,8 +155,8 @@ export class WorkoutsService {
         createdAt: MoreThanOrEqual(oneYearAgo)
       },
       order: { createdAt: 'DESC' },
-      take: limit,   // LIMIT
-      skip: offset,  // OFFSET
+      take: limit,
+      skip: offset,
     });
   }
 
@@ -170,7 +169,7 @@ export class WorkoutsService {
     return await this.goalsRepository.save(newGoal);
   }
 
-  // 6. קבלת היעדים וחישוב התקדמות דינמי ומדויק בזמן אמת
+  // 6. קבלת היעדים וחישוב התקדמות מתוקן
   async getUserGoals(userId: number) {
     const goals = await this.goalsRepository.find({ where: { userId } });
     const workouts = await this.workoutRepository.find({ where: { userId } });
@@ -187,12 +186,28 @@ export class WorkoutsService {
       const cleanGoalStart = goal.startDate.split('T')[0];
       const cleanGoalEnd = goal.endDate.split('T')[0];
 
+      // נורמליזציה לימים שנבחרו (המרת כל הימים לאותיות קטנות למניעת אי-התאמות)
+      const normalizedSelectedDays = goal.selectedDays && Array.isArray(goal.selectedDays)
+        ? goal.selectedDays.map((d: string) => d.toLowerCase())
+        : [];
+
       let rawCurrentValue = 0;
       if (goal.periodType === 'DAILY') {
         const todayWorkouts = workouts.filter(w => {
           const cleanWorkoutDate = w.date.split('T')[0];
           const workoutCreatedAtTime = new Date(w.createdAt).getTime();
-          return cleanWorkoutDate === todayStr && workoutCreatedAtTime >= goalCreatedAtTime;
+          
+          const isToday = cleanWorkoutDate === todayStr && workoutCreatedAtTime >= goalCreatedAtTime;
+          
+          if (!isToday) return false;
+
+          // אם יש ימים מסוימים שנבחרו, נוודא שהיום הנוכחי מופיע ביניהם
+          if (normalizedSelectedDays.length > 0) {
+            const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            return normalizedSelectedDays.some(d => d.includes(todayDayName) || todayDayName.includes(d));
+          }
+          
+          return true;
         });
         rawCurrentValue = todayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
       } else {
@@ -234,7 +249,7 @@ export class WorkoutsService {
         const totalDaysElapsed = Math.floor((currentEvaluationDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         let targetDaysCount = 0;
         let successfulDays = 0;
-        const dayNamesMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayNamesMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
         for (let i = 0; i < totalDaysElapsed; i++) {
           const d = new Date(start);
@@ -242,8 +257,9 @@ export class WorkoutsService {
           const currentDayStr = d.toISOString().split('T')[0];
           const currentDayName = dayNamesMap[d.getDay()];
 
-          if (goal.selectedDays && goal.selectedDays.length > 0) {
-            if (!goal.selectedDays.includes(currentDayName)) continue; 
+          if (normalizedSelectedDays.length > 0) {
+            const isSelected = normalizedSelectedDays.some(sd => sd.includes(currentDayName) || currentDayName.includes(sd));
+            if (!isSelected) continue; 
           }
           targetDaysCount++;
 
