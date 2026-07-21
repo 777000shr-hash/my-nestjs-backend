@@ -103,7 +103,7 @@ const expiresAt = new Date();
     });
 
     try {
-      const { data, error } = await Resend.emails.send({
+      const { data, error } = await resend.emails.send({
         from: 'Alrobics Support <onboarding@resend.dev>',
         to: [email],
         subject: 'Your password recovery code',
