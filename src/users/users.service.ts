@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import sgMail from '@sendgrid/mail';
+import { Resend } from 'resend';
 import { ConfigService } from '@nestjs/config';
 
 
