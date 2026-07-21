@@ -4,7 +4,9 @@ import { UsersModule } from './users/users.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './users/jwt.strategy';
-import { WorkoutsModule } from './workouts/workouts.module'; // <-- שורה 1: הוספת ה-Import שלך
+import { WorkoutsModule } from './workouts/workouts.module';
+import { AppController } from './app.controller';
+
 
 @Module({
   imports: [
@@ -29,7 +31,8 @@ import { WorkoutsModule } from './workouts/workouts.module'; // <-- שורה 1: 
       }),
     }),
     UsersModule,
-    WorkoutsModule, // <-- שורה 2: הוספת המודול שלך בסוף מערך ה-imports
+    WorkoutsModule, 
   ],
+  controllers: [AppController],
 })
 export class AppModule {}
