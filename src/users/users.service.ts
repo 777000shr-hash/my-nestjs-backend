@@ -88,7 +88,7 @@ export class UsersService {
     }
 
     const apiKey = this.configService.get<string>('SENDGRID_API_KEY');
-    sgMail.setApiKey(apiKey || '');
+    const resend = new Resend(apiKey);
 
     const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
 
@@ -103,7 +103,7 @@ const expiresAt = new Date();
     });
 
     try {
-      const { data, error } = await resend.emails.send({
+      const { data, error } = await Resend.emails.send({
         from: 'Alrobics Support <onboarding@resend.dev>',
         to: [email],
         subject: 'Your password recovery code',
