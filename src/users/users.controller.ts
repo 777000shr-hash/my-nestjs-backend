@@ -28,11 +28,13 @@ export class UsersController {
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto.username, createUserDto.email, createUserDto.passwordHash);
   }
+  
   @UseGuards(JwtAuthGuard)
   @Get(':id')
   findOne(@Param('id') id: string){
     return this.usersService.findOne(+id);
   }
+  
   @UseGuards(JwtAuthGuard)
   @Get()
   findAll(){
