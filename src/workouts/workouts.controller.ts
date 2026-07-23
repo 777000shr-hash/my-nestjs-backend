@@ -6,7 +6,9 @@ import { JwtAuthGuard } from '../users/jwt-auth.guard';
 export class WorkoutsController {
   constructor(private readonly workoutsService: WorkoutsService) {}
 
-  // 1. שמירת אימון חדש
+  /**
+   * Log a new workout entry for the authenticated user
+   */
   @UseGuards(JwtAuthGuard)
   @Post()
   async addWorkout(
@@ -22,7 +24,9 @@ export class WorkoutsController {
     return this.workoutsService.addWorkout(userId, reps, workoutType, duration, calories, date, day);
   }
 
-  // 2. קבלת סטטיסטיקות משתמש
+  /**
+   * Retrieve aggregate statistics for the authenticated user
+   */
   @UseGuards(JwtAuthGuard)
   @Get('stats')
   async getUserStats(@Req() req: any) {
@@ -30,7 +34,9 @@ export class WorkoutsController {
     return this.workoutsService.getUserStats(userId);
   }
 
-  // 3א. לוח שיאים שבועי - קלוריות (Top 10 + מיקום נוכחי) - דורש טוקן כעת
+  /**
+   * Fetch weekly calories leaderboard (Top 10 and current user rank)
+   */
   @UseGuards(JwtAuthGuard)
   @Get('leaderboard/calories')
   async getCaloriesLeaderboard(@Req() req: any) {
@@ -38,7 +44,9 @@ export class WorkoutsController {
     return this.workoutsService.getCaloriesLeaderboard(userId);
   }
 
-  // 3ב. לוח שיאים שבועי - חזרות (Top 10 + מיקום נוכחי) - דורש טוקן כעת
+  /**
+   * Fetch weekly reps leaderboard (Top 10 and current user rank)
+   */
   @UseGuards(JwtAuthGuard)
   @Get('leaderboard/reps')
   async getRepsLeaderboard(@Req() req: any) {
@@ -46,7 +54,9 @@ export class WorkoutsController {
     return this.workoutsService.getRepsLeaderboard(userId);
   }
 
-  // 4. שליפת היסטוריית אימונים - מעודכן עם תמיכה ב-limit ו-offset
+  /**
+   * Retrieve paginated workout history for the authenticated user
+   */
   @UseGuards(JwtAuthGuard)
   @Get('history')
   async getWorkoutHistory(
@@ -60,7 +70,9 @@ export class WorkoutsController {
     return this.workoutsService.getWorkoutHistory(userId, parsedLimit, parsedOffset);
   }
 
-  // 5. יצירת יעד חדש
+  /**
+   * Create a new goal for the authenticated user
+   */
   @UseGuards(JwtAuthGuard)
   @Post('goals')
   async createGoal(@Req() req: any, @Body() goalData: any) {
@@ -68,7 +80,9 @@ export class WorkoutsController {
     return await this.workoutsService.createGoal(userId, goalData);
   }
 
-  // 6. קבלת היעדים של המשתמש (מחולק לפעילים ומהעבר)
+  /**
+   * Retrieve all goals for the authenticated user (categorized into active and past)
+   */
   @UseGuards(JwtAuthGuard)
   @Get('goals')
   async getUserGoals(@Req() req: any) {
@@ -76,7 +90,9 @@ export class WorkoutsController {
     return await this.workoutsService.getUserGoals(userId);
   }
 
-  // 7. מחיקת יעד אישי מאובטח ללא ID של משתמש בנתיב
+  /**
+   * Delete a specific goal by ID for the authenticated user
+   */
   @UseGuards(JwtAuthGuard)
   @Delete('goals/:id')
   async deleteGoal(@Req() req: any, @Param('id') goalId: string) {
