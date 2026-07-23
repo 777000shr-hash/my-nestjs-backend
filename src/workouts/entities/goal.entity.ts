@@ -26,13 +26,13 @@ export class Goal {
   targetValue: number;
 
   @Column({ type: 'varchar', nullable: true })
-  startDate: string; // מקבל תאריך ישירות מהפרונט
+  startDate: string; 
 
   @Column({ type: 'varchar', nullable: true })
-  endDate: string; // מקבל תאריך ישירות מהפרונט (בוטל החישוב האוטומטי)
+  endDate: string; 
 
   @Column({ type: 'json', nullable: true })
-  selectedDays: string[]; // מערך הימים הנבחרים ליעד יומי
+  selectedDays: string[]; 
 
   @CreateDateColumn()
   createdAt: Date;
