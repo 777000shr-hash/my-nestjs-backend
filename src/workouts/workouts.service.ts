@@ -213,14 +213,12 @@ export class WorkoutsService {
           const workoutCreatedAtTime = new Date(w.createdAt).getTime();
           
           const isToday = cleanWorkoutDate === todayStr && workoutCreatedAtTime >= goalCreatedAtTime;
-          
           if (!isToday) return false;
 
           if (normalizedSelectedDays.length > 0) {
             const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
             return normalizedSelectedDays.some(d => d.includes(todayDayName) || todayDayName.includes(d));
           }
-          
           return true;
         });
         rawCurrentValue = todayWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
@@ -238,7 +236,6 @@ export class WorkoutsService {
                                 cleanWorkoutDate <= cleanGoalEnd;
 
           if (!isInDateRange) return false;
-
           if (cleanWorkoutDate === cleanGoalStart) {
             return workoutCreatedAtTime >= goalCreatedAtTime;
           }
@@ -291,7 +288,47 @@ export class WorkoutsService {
         }
         persistenceProgress = targetDaysCount > 0 ? Math.round((successfulDays / targetDaysCount) * 100) : 0;
       } else {
-        persistenceProgress = currentProgressPercentage;
+        const totalDaysDiff = Math.floor((currentEvaluationDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const totalWeeksElapsed = Math.ceil(totalDaysDiff / 7);
+
+        let evaluatedWeeks = 0;
+        let successfulWeeks = 0;
+
+        for (let weekIndex = 0; weekIndex < totalWeeksElapsed; weekIndex++) {
+          const weekStart = new Date(start);
+          weekStart.setDate(weekStart.getDate() + weekIndex * 7);
+
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekEnd.getDate() + 6);
+
+          const weekStartStr = weekStart.toISOString().split('T')[0];
+          const weekEndStr = weekEnd.toISOString().split('T')[0];
+
+          const isCurrentWeek = todayStr >= weekStartStr && todayStr <= weekEndStr;
+
+          const weekWorkouts = workouts.filter(w => {
+            const cleanWorkoutDate = w.date.split('T')[0];
+            const workoutCreatedAtTime = new Date(w.createdAt).getTime();
+
+            if (cleanWorkoutDate < weekStartStr || cleanWorkoutDate > weekEndStr) return false;
+            if (cleanWorkoutDate === cleanGoalStart) {
+              return workoutCreatedAtTime >= goalCreatedAtTime;
+            }
+            return true;
+          });
+
+          const weekTotal = weekWorkouts.reduce((sum, w) => sum + (isCalories ? w.calories : w.reps), 0);
+          const isWeekAchieved = weekTotal >= goal.targetValue;
+
+          if (isWeekAchieved) {
+            successfulWeeks++;
+            evaluatedWeeks++;
+          } else if (!isCurrentWeek) {
+            evaluatedWeeks++;
+          }
+        }
+
+        persistenceProgress = evaluatedWeeks > 0 ? Math.round((successfulWeeks / evaluatedWeeks) * 100) : 0;
       }
 
       const isCompleted = persistenceProgress >= 100;
@@ -305,7 +342,6 @@ export class WorkoutsService {
         isCompleted: isCompleted
       };
 
-      // Goals remain active as long as the end date hasn't passed
       if (todayStr <= cleanGoalEnd) {
         active.push(formattedGoal);
       } else {
