@@ -87,16 +87,7 @@ export class UsersService {
       throw new NotFoundException('No registered user found with this email address');
     }
 
-    const gmailUser = this.configService.get<string>('GMAIL_USER');
-    const gmailPassword = this.configService.get<string>('GMAIL_APP_PASSWORD');
-
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: gmailUser,
-        pass: gmailPassword,
-      },
-    });
+    const brevoApiKey = this.configService.get<string>('BREVO_API_KEY');
 
     const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
 
@@ -111,14 +102,28 @@ export class UsersService {
     });
 
     try {
-      await transporter.sendMail({
-        from: 'Alrobics Support <airobics.app@gmail.com>',
-        to: email,
-        subject: 'Your password recovery code',
-        text: `Hello, your password recovery verification code is: ${verificationCode}
-          This code is valid for the next 5 minutes only.`,
-        html: `<strong>Hello,</strong><br>Your password recovery verification code is: <h1>${verificationCode}</h1>`,
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': brevoApiKey || '',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { name: 'Alrobics Support', email: 'airobics.app@gmail.com' },
+          to: [{ email }],
+          subject: 'Your password recovery code',
+          textContent: `Hello, your password recovery verification code is: ${verificationCode}
+            This code is valid for the next 5 minutes only.`,
+          htmlContent: `<strong>Hello,</strong><br>Your password recovery verification code is: <h1>${verificationCode}</h1>`,
+        }),
       });
+
+      if (!response.ok) {
+        const errorBody = await response.json();
+        console.error('Error sending email:', errorBody);
+        throw new Error('The recovery email could not be sent');
+      }
 
       console.log('Email sent successfully!');
     } catch (error: any) {
