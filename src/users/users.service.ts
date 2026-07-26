@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { Resend } from 'resend';
+import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config';
 
 
@@ -87,15 +87,23 @@ export class UsersService {
       throw new NotFoundException('No registered user found with this email address');
     }
 
-    const apiKey = this.configService.get<string>('SENDGRID_API_KEY');
-    const resend = new Resend(apiKey);
+    const gmailUser = this.configService.get<string>('GMAIL_USER');
+    const gmailPassword = this.configService.get<string>('GMAIL_APP_PASSWORD');
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: gmailUser,
+        pass: gmailPassword,
+      },
+    });
 
     const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
 
     user.resetCode = verificationCode;
     await this.usersRepository.save(user);
 
-const expiresAt = new Date();
+    const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 5);
 
     await this.usersRepository.update(user.id, {
@@ -103,21 +111,16 @@ const expiresAt = new Date();
     });
 
     try {
-      const { data, error } = await resend.emails.send({
-        from: 'Alrobics Support <onboarding@resend.dev>',
-        to: [email],
+      await transporter.sendMail({
+        from: 'Alrobics Support <airobics.app@gmail.com>',
+        to: email,
         subject: 'Your password recovery code',
         text: `Hello, your password recovery verification code is: ${verificationCode}
           This code is valid for the next 5 minutes only.`,
         html: `<strong>Hello,</strong><br>Your password recovery verification code is: <h1>${verificationCode}</h1>`,
       });
 
-      if (error) {
-        console.error('Error sending email:', error);
-        throw new Error('The recovery email could not be sent');
-      }
-
-      console.log('Email sent successfully!', data);
+      console.log('Email sent successfully!');
     } catch (error: any) {
       console.error('Error sending email:', error);
       throw new Error('The recovery email could not be sent');
