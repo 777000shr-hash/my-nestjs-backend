@@ -6,7 +6,6 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
-
 @Injectable()
 export class UsersService {
   constructor(
@@ -14,12 +13,9 @@ export class UsersService {
     private usersRepository: Repository<User>,
     private jwtService: JwtService, 
     private configService: ConfigService,
-  ) {
-    
-  }
+  ) {}
 
-  async create(username: string, email: string, passwordHash: string) {
-
+  async create(username: string, email: string, passwordHash: string, displayName?: string) {
     const existingUser = await this.usersRepository.findOne({ 
       where: { email: email } 
     });
@@ -29,7 +25,14 @@ export class UsersService {
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(passwordHash, salt);
-    const newUser = this.usersRepository.create({ username, email, passwordHash: hashedPassword });
+    
+    // אם לא הוכנס displayName, משתמשים ב-username כברירת מחדל
+    const newUser = this.usersRepository.create({ 
+      username, 
+      displayName: displayName || username,
+      email, 
+      passwordHash: hashedPassword 
+    });
     
     return await this.usersRepository.save(newUser);
   }
@@ -40,10 +43,11 @@ export class UsersService {
 
   async findAll(){
     return await this.usersRepository.find({
-    select: {
+      select: {
         id: true,
         email: true,
         username: true,
+        displayName: true,
       }
     });
   }
@@ -79,7 +83,6 @@ export class UsersService {
   }
 
   async sendPasswordResetCode(email: string): Promise<void> {
-
     const user = await this.usersRepository.findOne({ where: { email } });
 
     if (!user) {
@@ -132,8 +135,7 @@ export class UsersService {
   }
 
   async verifyResetCode(email: string, code: string): Promise<boolean> {
-  
-   const user = await this.usersRepository.findOne({ where: { email } });
+    const user = await this.usersRepository.findOne({ where: { email } });
 
     if (!user) {
       throw new NotFoundException('User does not exist');
@@ -143,7 +145,6 @@ export class UsersService {
       throw new BadRequestException('The verification code is invalid.');
     }
 
-    const now = new Date();
     if (user.resetTokenExpiresAt && new Date() > new Date(user.resetTokenExpiresAt)) {
       throw new BadRequestException('Code has expired');
     }
@@ -164,10 +165,10 @@ export class UsersService {
     user.passwordHash = hashedPassword;
     user.resetCode = null;
     await this.usersRepository.update(user.id, {
-    passwordHash: hashedPassword,
-    resetCode: null,
-    resetTokenExpiresAt: null
-  });
+      passwordHash: hashedPassword,
+      resetCode: null,
+      resetTokenExpiresAt: null
+    });
     
     return { message: 'Password updated successfully' };
   }
