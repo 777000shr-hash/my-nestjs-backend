@@ -14,10 +14,12 @@ export class User {
   @Column()
   username!: string;
 
+  @Column({ nullable: true })
+  displayName?: string;
+
   @Column({ nullable: true, type: 'varchar'})
   resetCode!: string | null;
 
   @Column({ nullable: true, type: 'varchar'})
   resetTokenExpiresAt!: Date | null;
-
 }
