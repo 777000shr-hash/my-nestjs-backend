@@ -81,7 +81,8 @@ export class WorkoutsService {
 
         return {
           id: user.id,
-          username: user.username,
+          // ✅ מחזיר את ה-displayName, ואם המשתמש לא הזין - מחזיר את ה-username
+          username: user.displayName || user.username,
           score,
           lastWorkoutTime
         };
@@ -130,7 +131,6 @@ export class WorkoutsService {
    * Get weekly reps leaderboard (Top 10 & Current User Rank)
    */
   async getRepsLeaderboard(currentUserId: number) {
-    // Fixed: now sums w.reps instead of w.calories
     const fullBoard = await this.buildFullLeaderboardData((workouts) => workouts.reduce((sum, w) => sum + w.reps, 0));
     const userIndex = fullBoard.findIndex(u => u.id === currentUserId);
     const userScore = userIndex !== -1 ? fullBoard[userIndex].score : 0;
